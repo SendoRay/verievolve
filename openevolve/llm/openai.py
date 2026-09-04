@@ -63,6 +63,7 @@ class OpenAILLM(LLMInterface):
         self.api_key = model_cfg.api_key
         self.random_seed = getattr(model_cfg, "random_seed", None)
         self.reasoning_effort = getattr(model_cfg, "reasoning_effort", None)
+        self.extra_body = getattr(model_cfg, "extra_body", None)
 
         # Manual mode: enabled via llm.manual_mode in config.yaml
         self.manual_mode = (getattr(model_cfg, "manual_mode", False) is True)
@@ -165,6 +166,12 @@ class OpenAILLM(LLMInterface):
             reasoning_effort = kwargs.get("reasoning_effort", self.reasoning_effort)
             if reasoning_effort is not None:
                 params["reasoning_effort"] = reasoning_effort
+
+        # Arbitrary provider-specific request body params (e.g. enable_thinking
+        # for Qwen hybrid-thinking models on OpenAI-compatible endpoints)
+        extra_body = kwargs.get("extra_body", self.extra_body)
+        if extra_body is not None:
+            params["extra_body"] = extra_body
 
         # Add seed parameter for reproducibility if configured
         # Skip seed parameter for Google AI Studio endpoint as it doesn't support it

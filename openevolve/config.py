@@ -82,6 +82,10 @@ class LLMModelConfig:
     # Reasoning parameters
     reasoning_effort: Optional[str] = None
 
+    # Arbitrary extra request body params (e.g. {enable_thinking: false} for
+    # Qwen hybrid-thinking models served via OpenAI-compatible endpoints)
+    extra_body: Optional[Dict[str, Any]] = None
+
     # Claude Code CLI budget per call (USD)
     max_budget_usd: Optional[float] = None
 
@@ -191,6 +195,7 @@ class LLMConfig(LLMModelConfig):
             "random_seed": self.random_seed,
             "reasoning_effort": self.reasoning_effort,
             "manual_mode": self.manual_mode,
+            "extra_body": self.extra_body,
         }
         self.update_model_params(shared_config)
 
@@ -247,6 +252,7 @@ class LLMConfig(LLMModelConfig):
             "retry_delay": self.retry_delay,
             "random_seed": self.random_seed,
             "reasoning_effort": self.reasoning_effort,
+            "extra_body": self.extra_body,
         }
         self.update_model_params(shared_config)
 

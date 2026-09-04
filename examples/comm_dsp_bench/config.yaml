@@ -1,0 +1,56 @@
+# CommDSP-Bench PoC 配置（cmul 任务）
+# 进化运行需要设置 LLM API key（如 OPENAI_API_KEY / GEMINI_API_KEY）
+
+max_iterations: 40
+checkpoint_interval: 10
+log_level: "INFO"
+
+# 显式指定语言，避免 Verilog 的 module 关键字被误判（框架 extract_code_language）
+language: "verilog"
+
+llm:
+  # 阿里云百炼 Token Plan（OpenAI 兼容端点）
+  # key 从环境变量 COMMDSP_API_KEY 读取（不落盘，.api_key 文件已 gitignore）
+  api_base: "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+  api_key: "${COMMDSP_API_KEY}"
+  primary_model: "qwen3.8-max"
+  primary_model_weight: 1.0
+  temperature: 0.8
+  max_tokens: 8192
+  timeout: 180
+  retries: 2
+  # 关闭 Qwen 混合思维链（显著降低时延与 token 消耗）
+  extra_body:
+    enable_thinking: false
+
+# 进化提示（SPEC §9：不得包含任务算法提示）
+prompt:
+  num_top_programs: 3
+  num_diverse_programs: 2
+  use_template_stochasticity: true
+
+# MAP-Elites：精度-面积-吞吐 三维 Pareto 网格（SPEC §5.5）
+database:
+  population_size: 40
+  archive_size: 24
+  num_islands: 2
+  feature_dimensions: ["precision", "area", "throughput"]
+  feature_bins:
+    precision: 8
+    area: 8
+    throughput: 4
+  elite_selection_ratio: 0.2
+  exploration_ratio: 0.3
+  exploitation_ratio: 0.7
+
+# 级联评估：stage1 冒烟分数（SQNR/60 clamp [0,1]）需 ≥ 0.2（约 12 dB）
+evaluator:
+  cascade_evaluation: true
+  cascade_thresholds: [0.2]
+  timeout: 120
+  parallel_evaluations: 2
+
+# Diff 进化（适配 Verilog SEARCH/REPLACE 块）
+diff_based_evolution: true
+allow_full_rewrites: false
+max_code_length: 20000

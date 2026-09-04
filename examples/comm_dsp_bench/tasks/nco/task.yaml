@@ -1,0 +1,55 @@
+# CommDSP-Bench task: nco
+# See ../../SPEC.md for the full specification.
+
+spec_version: 1
+task: nco
+
+# 该字段进入 LLM prompt（数学规范全文）。禁止包含任何算法提示（SPEC §9）。
+spec: |
+  实现数控振荡器（NCO）：输出正弦样本流，振荡频率由频率控制字 FCW 控制。
+
+  相位模型：24 位相位累加器，复位后相位为 0。每当 in_valid 与 in_ready
+  同时为高的时钟上升沿，DUT 采样当前 FCW，相位累加器加上该 FCW 值
+  （模 2^24），并输出一个样本：sin(2*pi*phase/2^24)。即输出样本率为
+  每个输入握手拍一个，相位连续演化（FCW 变化立即反映在下一拍的步进量上）。
+
+  输出 sin_out 为 16 位有符号数，Q1.15 定点（数值 = 整数值/2^15）。
+  FCW 为 24 位无符号数，对应归一化频率 fcw/2^24（每样本周期数），
+  测试覆盖约 0.01*fs 到 0.47*fs 的频率范围。
+
+  设计目标：在频谱纯度（SFDR）、综合面积、吞吐三者之间探索不同的折中点，
+  不同折中点都有价值。
+
+dut_module: top
+
+io_protocol:
+  base: stream_v1
+  inputs:
+    - {name: fcw, width: 24, signed: false, format: "unsigned, 归一化频率 = fcw/2^24"}
+  outputs:
+    - {name: sin_out, width: 16, signed: true, format: "signed Q1.15"}
+  extensions: []
+
+golden:
+  stimulus:
+    distribution: nco_fcw_sequence
+    samples: 114688   # 7 段 x 16384（PoC 段长；正式版可提至 65536/段）
+    seed: fresh_per_eval
+  reference:
+    impl: "float64 相位累加 + numpy.sin"
+
+metric:
+  type: sfdr
+  params:
+    segments: 7
+    segment_len: 16384
+    transient: 64            # 每段起始丢弃样本（SPEC §8.3）
+    mainlobe_bins: 8
+    fcws: [179000, 392000, 780000, 1600000, 3400000, 5600000, 7900000]
+
+constraints: {}
+
+timeouts:
+  L1: 5
+  L2_sim: 60    # 114688 样本，迭代型设计需要更长仿真
+  L2_synth: 60

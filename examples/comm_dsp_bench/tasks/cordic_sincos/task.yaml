@@ -1,0 +1,53 @@
+# CommDSP-Bench task: cordic_sincos
+# See ../../SPEC.md for the full specification.
+
+spec_version: 1
+task: cordic_sincos
+
+# 该字段进入 LLM prompt（数学规范全文）。禁止包含任何算法提示（SPEC §9）。
+spec: |
+  实现一个正弦/余弦函数发生器：给定角度 z，输出 sin(z) 与 cos(z)。
+
+  接口为流式握手协议（valid/ready）。输入 z 为 16 位有符号数，
+  线性编码角度：角度（弧度）= z * pi / 2^15，即 z 的取值范围
+  [-32768, 32767] 对应 [-pi, pi)。
+
+  输出 sin_out 与 cos_out 均为 16 位有符号数，格式为 Q1.15 定点
+  （即数值 = 整数值 / 2^15，表示范围约 [-1.0, 0.99997]）。
+
+  复位释放后，每当 in_valid 与 in_ready 同时为高的时钟上升沿，
+  DUT 采样一组输入；对应的输出应在 out_valid 为高时给出，
+  out_ready 由测试环境保持为高。每组输入恰好产生一组输出，顺序保持。
+
+  设计目标：在精度（相对浮点参考的 SQNR）、综合面积、吞吐三者之间
+  探索不同的折中点，不同折中点都有价值。
+
+dut_module: top
+
+io_protocol:
+  base: stream_v1
+  inputs:
+    - {name: z, width: 16, signed: true, format: "signed 线性角度，theta = z*pi/2^15, [-pi, pi)"}
+  outputs:
+    - {name: sin_out, width: 16, signed: true, format: "signed Q1.15"}
+    - {name: cos_out, width: 16, signed: true, format: "signed Q1.15"}
+  extensions: []
+
+golden:
+  stimulus:
+    distribution: uniform_angle
+    samples: 65536
+    seed: fresh_per_eval
+  reference:
+    impl: "numpy.sin / numpy.cos on float64（角度由线性编码换算）"
+
+metric:
+  type: sqnr
+  params: {}
+
+constraints: {}
+
+timeouts:
+  L1: 5        # 秒，冒烟仿真
+  L2_sim: 30   # 秒，全量仿真
+  L2_synth: 60 # 秒，综合
