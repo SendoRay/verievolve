@@ -1,0 +1,45 @@
+# CommDSP-Bench 生成实例（任务族第二层）：crc16_step1
+# 由 task_family_gen.py 自动生成；golden/激励由 evaluator 按 family 分发
+
+spec_version: 2
+task: crc16_step1
+
+spec: |
+  实现流式 CRC-16 校验器（3GPP 风格：MSB-first、非反射、初值全 0）。
+
+  生成多项式：g(x) = x^16+x^12+x^5+1（十六进制 0x1021）。
+  输入为 16 位数据字流。每接收一个数据字后，输出"从复位起、包含当前字在内的
+  全部数据位"的累积 CRC-16 值。
+  数据以 MSB-first 顺序进入寄存器：每个字的高位（bit15）最先处理。
+
+dut_module: top
+
+io_protocol:
+  base: stream_v1
+  inputs:
+    - {name: data, width: 16, signed: false, format: 'unsigned 字流'}
+  outputs:
+    - {name: crc, width: 16, signed: false, format: 'unsigned 累积 CRC'}
+  extensions: []
+
+golden:
+  stimulus:
+    distribution: uniform_words
+    samples: 8192
+    seed: fresh_per_eval
+  reference:
+    impl: "float64（evaluator 按 family 注册分发，参数见 metric.params）"
+
+metric:
+  type: exact_match
+  params:
+    width: 16
+    poly: "0x1021"
+    step_hint: 1
+
+constraints: {}
+
+timeouts:
+  L1: 5
+  L2_sim: 30
+  L2_synth: 300

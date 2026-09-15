@@ -440,6 +440,10 @@ class Config:
 
     # Evolution settings
     diff_based_evolution: bool = True
+
+    # Probability that a diff-based run samples a full-rewrite iteration
+    # (mixed exploration mode: 0.0 = pure diff, 1.0 = always full rewrite)
+    full_rewrite_probability: float = 0.0
     max_code_length: int = 10000
     diff_pattern: str = r"<<<<<<< SEARCH\n(.*?)=======\n(.*?)>>>>>>> REPLACE"
 

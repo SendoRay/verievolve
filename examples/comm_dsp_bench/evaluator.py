@@ -16,6 +16,7 @@ import json
 import math
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -81,14 +82,85 @@ def _stimulus_gaussian_white(n: int, rng: random.Random, task: dict = None) -> L
 def _stimulus_nco_fcw_sequence(n: int, rng: random.Random, task: dict = None) -> List[List[int]]:
     """NCO FCW 序列：segment 段内恒定 FCW，每拍一组输入（当前 FCW），1 字段一组。
 
-    FCW 集合与段长在 task.yaml metric.params 中锁定。"""
+    FCW 集合与段长在 task.yaml metric.params 中锁定（旧版从 params 直接读；
+    新版按相位位宽缩放到全幅）。"""
     params = (task or {}).get("metric", {}).get("params", {})
     seg_len = int(params.get("segment_len", 16384))
     fcws = params.get("fcws", [1000000])
+    pw = int(params.get("phase_bits", 24))
     rows = []
     for i in range(n):
         seg = min(i // seg_len, len(fcws) - 1)
-        rows.append([int(fcws[seg]) & 0xFFFFFF])
+        f = int(fcws[seg])
+        # 归一化频率缩放：fcw 值为 /2^20 归一化 → 按相位位宽放大到全幅
+        f_full = (f << (pw - 20)) if pw > 20 else (f >> (20 - pw))
+        rows.append([f_full & ((1 << pw) - 1)])
+    return rows
+
+
+def _stimulus_uniform_words(n: int, rng: random.Random, task: dict = None) -> List[List[int]]:
+    """均匀随机 16 位无符号字（CRC/加扰族）"""
+    return [[rng.randint(0, 0xFFFF)] for _ in range(n)]
+
+
+def _stimulus_uniform_complex(n: int, rng: random.Random, task: dict = None) -> List[List[int]]:
+    """均匀幅角复数（atan2 族）：幅值 0.2–1.0 均匀，避免纯原点"""
+    w = int((task or {}).get("metric", {}).get("params", {}).get("width", 16))
+    half = 1 << (w - 1)
+    rows = []
+    for _ in range(n):
+        ang = rng.uniform(-math.pi, math.pi)
+        mag = rng.uniform(0.2, 1.0) * (half - 1)
+        i = int(round(mag * math.cos(ang)))
+        q = int(round(mag * math.sin(ang)))
+        rows.append([max(-(half), min(half - 1, i)), max(-(half), min(half - 1, q))])
+    return rows
+
+
+def _stimulus_qam_awgn(n: int, rng: random.Random, task: dict = None) -> List[List[int]]:
+    """QAM 星座 + AWGN（LLR 族）：随机比特→Gray 星座→加噪，Q4.12 输入刻度"""
+    params = (task or {}).get("metric", {}).get("params", {})
+    bits = int(params.get("bits", 3))
+    sigma2 = float(params.get("sigma2", 0.01))
+    sigma = math.sqrt(sigma2)
+    half_b = bits  # 每轴比特数
+    # 标准方形 QAM Gray 映射（每轴独立，奇数格点 ±1,±3,...）
+    def axis_gray(val_b: int, nb: int) -> float:
+        # val_b: nb 位整数 → Gray → 格点
+        g = val_b ^ (val_b >> 1)  # binary->gray
+        # gray 码到 PAM 幅度：标准映射（位高位定符号，低位镜像）
+        amp = 0
+        for k in range(nb):
+            bit = (g >> (nb - 1 - k)) & 1
+            if k == 0:
+                sign = -1 if bit else 1
+            else:
+                # 后续位：幅度折叠（标准 Gray PAM）
+                amp |= bit << (nb - 1 - k)
+        # 幅度取奇数值：amp ∈ {0..2^(nb-1)-1} → 2*amp+1，符号在最前
+        return sign * (2 * amp + 1)
+    rows = []
+    for _ in range(n):
+        bi = rng.randint(0, (1 << half_b) - 1)
+        bq = rng.randint(0, (1 << half_b) - 1)
+        si = axis_gray(bi, half_b)
+        sq = axis_gray(bq, half_b)
+        yi = si + rng.gauss(0, sigma)
+        yq = sq + rng.gauss(0, sigma)
+        sc = 4096.0  # Q4.12
+        i16 = int(round(yi * sc))
+        q16 = int(round(yq * sc))
+        rows.append([max(-32768, min(32767, i16)), max(-32768, min(32767, q16))])
+    return rows
+
+
+def _stimulus_complex_stream(n: int, rng: random.Random, task: dict = None) -> List[List[int]]:
+    """复数高斯流（匹配滤波族）：白噪声复样本，Q1.15"""
+    rows = []
+    for _ in range(n):
+        i = int(round(rng.gauss(0, 9000)))
+        q = int(round(rng.gauss(0, 9000)))
+        rows.append([max(-32768, min(32767, i)), max(-32768, min(32767, q))])
     return rows
 
 
@@ -139,6 +211,10 @@ _STIMULUS_IMPLS = {
     "uniform_angle": _stimulus_uniform_angle,
     "gaussian_white": _stimulus_gaussian_white,
     "nco_fcw_sequence": _stimulus_nco_fcw_sequence,
+    "uniform_words": _stimulus_uniform_words,
+    "uniform_complex": _stimulus_uniform_complex,
+    "qam_awgn": _stimulus_qam_awgn,
+    "complex_stream": _stimulus_complex_stream,
 }
 _GOLDEN_IMPLS = {
     "cmul": _golden_cmul,
@@ -326,6 +402,41 @@ def _run_sim(workdir: str, program_path: str, timeout: int) -> Tuple[bool, str]:
 # Yosys 综合（ice40 面积口径）
 # ---------------------------------------------------------------------------
 
+PDK_LIB = str(Path(__file__).resolve().parent / "pdk" / "NangateOpenCellLibrary_typical.lib")
+
+
+def _run_yosys_asic(workdir: str, program_path: str, timeout: int) -> Tuple[Optional[float], str]:
+    """Nangate45 ASIC 口径（论文主口径，对齐 REvolution）：synth-noabc → dffunmap →
+    dfflibmap → abc 映射 → stat 提取 Chip area（μm²，含时序单元）。"""
+    if not Path(PDK_LIB).exists():
+        return None, "Nangate45 liberty missing (pdk/NangateOpenCellLibrary_typical.lib)"
+    log_path = Path(workdir) / "asic_stat.txt"
+    script = (
+        f"read_verilog {program_path}; "
+        f"synth -top top -noabc; dffunmap; "
+        f"dfflibmap -liberty {PDK_LIB}; "
+        f"abc -liberty {PDK_LIB}; "
+        f"tee -o {log_path} stat -liberty {PDK_LIB}"
+    )
+    try:
+        p = subprocess.run(
+            ["yosys", "-q", "-p", script],
+            cwd=workdir, capture_output=True, text=True, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return None, "asic synthesis timeout"
+    if not log_path.exists():
+        return None, (p.stderr or p.stdout)[-2000:]
+    try:
+        text = log_path.read_text()
+        m = re.search(r"Chip area for module '\\top':\s*([0-9.]+)", text)
+        if not m:
+            return None, f"no chip area in stat: {text[-500:]}"
+        return float(m.group(1)), ""
+    except OSError as e:
+        return None, str(e)
+
+
 def _collect_cell_counts(node, acc: Dict[str, int]) -> None:
     """递归收集 stat -json 中的 cell 计数"""
     if isinstance(node, dict):
@@ -385,8 +496,11 @@ def _hex_to_signed(h: str, bits: int) -> int:
 _HEX_CHARS = set("0123456789abcdefABCDEF")
 
 
-def _read_outputs(path: Path, widths: List[int]) -> Optional[np.ndarray]:
+def _read_outputs(path: Path, widths: List[int],
+                  signed_flags: Optional[List[bool]] = None) -> Optional[np.ndarray]:
     rows = []
+    if signed_flags is None:
+        signed_flags = [True] * len(widths)
     try:
         with open(path) as f:
             for line in f:
@@ -396,7 +510,10 @@ def _read_outputs(path: Path, widths: List[int]) -> Optional[np.ndarray]:
                 # DUT 输出含 x/z（未初始化/高阻）→ 视为无效结果
                 if any(set(tok) - _HEX_CHARS for tok in parts):
                     return None
-                rows.append([_hex_to_signed(x, w) for x, w in zip(parts, widths)])
+                rows.append([
+                    _hex_to_signed(x, w) if s else int(x, 16)
+                    for x, w, s in zip(parts, widths, signed_flags)
+                ])
     except OSError:
         return None
     if not rows:
@@ -478,16 +595,146 @@ def _combined_score(sqnr_db: float, area: Optional[int], thr: Optional[float]) -
 # 核心评估流程
 # ---------------------------------------------------------------------------
 
+
+# ---------------------------------------------------------------------------
+# 任务族 golden（v2 生成层：按 task 名前缀分发，参数从 task.yaml 读）
+# ---------------------------------------------------------------------------
+
+def _bit_of(axis_index: int, nb: int, b: int) -> int:
+    """axis_index 的第 b 位（从 MSB 数，与激励生成约定一致）"""
+    return (axis_index >> (nb - 1 - b)) & 1
+
+
+def _axis_gray_map(val_b: int, nb: int) -> float:
+    """binary→Gray→奇数幅度（与 _stimulus_qam_awgn 完全一致）"""
+    g = val_b ^ (val_b >> 1)
+    amp = 0
+    sign = 1
+    for k in range(nb):
+        bit = (g >> (nb - 1 - k)) & 1
+        if k == 0:
+            sign = -1 if bit else 1
+        else:
+            amp |= bit << (nb - 1 - k)
+    return sign * (2 * amp + 1)
+
+
+def _golden_crc(rows: List[List[int]], params: dict) -> np.ndarray:
+    """流式 CRC（3GPP 风格 MSB-first 非反射）：逐位更新，每字输出累积值"""
+    width = int(params["width"])
+    poly = int(params["poly"], 16)
+    mask = (1 << width) - 1
+    crc = 0
+    out = []
+    for r in rows:
+        word = r[0] & 0xFFFF
+        for b in range(15, -1, -1):
+            bit = (word >> b) & 1
+            fb = ((crc >> (width - 1)) & 1) ^ bit
+            crc = (crc << 1) & mask
+            if fb:
+                crc ^= (poly & mask)
+        out.append(float(crc))
+    return np.array(out, dtype=np.float64).reshape(-1, 1)
+
+
+def _golden_llr(rows: List[List[int]], params: dict) -> np.ndarray:
+    """精确 LLR（log-sum-exp）：与激励同 Gray 映射分桶，Q8.8 刻度"""
+    bits = int(params["bits"])
+    sigma2 = float(params["sigma2"])
+    nbits = 2 * bits
+    axis_vals = [_axis_gray_map(v, bits) for v in range(1 << bits)]
+    sc = 4096.0  # Q4.12
+    llrs = np.zeros((len(rows), nbits), dtype=np.float64)
+    # 预计算每个 bit 的星座分桶（按 axis_index 的位）
+    buckets = []
+    for b in range(nbits):
+        ai = 0 if b < bits else 1  # I 轴 bit 在前
+        bb = b if b < bits else b - bits
+        s0 = [(si, sq) for si in range(1 << bits) for sq in range(1 << bits)
+              if _bit_of(si if ai == 0 else sq, bits, bb) == 0]
+        s1 = [(si, sq) for si in range(1 << bits) for sq in range(1 << bits)
+              if _bit_of(si if ai == 0 else sq, bits, bb) == 1]
+        buckets.append((s0, s1))
+    for idx, r in enumerate(rows):
+        yi = r[0] / sc
+        yq = r[1] / sc
+        for b in range(nbits):
+            s0, s1 = buckets[b]
+            d0 = np.array([-((yi - axis_vals[si])**2 - 2*(yi-axis_vals[si])*0 + (yq - axis_vals[sq])**2) / (2*sigma2) for si, sq in s0])
+            d1 = np.array([-((yi - axis_vals[si])**2 + (yq - axis_vals[sq])**2) / (2*sigma2) for si, sq in s1])
+            m0, m1 = d0.max(), d1.max()
+            l0 = m0 + np.log(np.exp(d0 - m0).sum())
+            l1 = m1 + np.log(np.exp(d1 - m1).sum())
+            # 2σ² 归一化 LLR（通信标准软信息口径）：ln 域差 × 2σ² = 距离差；
+            # Q8.8 定标（×256），16 位域充足（距离差 ≤ 最大格距²×2 ≈ 450×256 时饱和）
+            v = (l0 - l1) * 2.0 * sigma2 * 256.0  # Q8.8
+            llrs[idx, b] = max(-32768.0, min(32767.0, v))
+    return llrs
+
+
+def _golden_atan2(rows: List[List[int]], params: dict) -> np.ndarray:
+    """atan2 金标：线性角度码（与 cordic 同编码），四舍五入 + clamp"""
+    w = int(params.get("width", 16))
+    half = 1 << (w - 1)
+    arr = np.array(rows, dtype=np.float64)
+    theta = np.arctan2(arr[:, 1], arr[:, 0]) * half / np.pi
+    theta = np.round(theta)
+    theta = np.clip(theta, -half, half - 1)
+    return theta.reshape(-1, 1)
+
+
+def _golden_mfilt(rows: List[List[int]], params: dict) -> np.ndarray:
+    """匹配滤波：c[n] = sum_k S[k] * r[n-k]（S 正序，k=0 对应最新样本；
+    历史初始为零）——与任务卡 spec 约定一致"""
+    S = np.array(params["sequence"], dtype=np.float64)
+    arr = np.array(rows, dtype=np.float64)
+    c_re = np.convolve(arr[:, 0], S, mode="full")[: len(rows)]
+    c_im = np.convolve(arr[:, 1], S, mode="full")[: len(rows)]
+    return np.stack([c_re, c_im], axis=1)
+
+
+def _golden_nco_scaled(rows: List[List[int]], params: dict) -> np.ndarray:
+    """NCO 族金标：按相位位宽缩放"""
+    pw = int(params.get("phase_bits", 24))
+    arr = np.array(rows, dtype=np.int64)
+    phase = np.cumsum(arr[:, 0]) & ((1 << pw) - 1)
+    sin_q = np.sin(2.0 * np.pi * phase / (1 << pw)) * 32768.0
+    return np.stack([sin_q], axis=1)
+
+
+def _golden_family_dispatch(task: dict, rows: List[List[int]]) -> np.ndarray:
+    """任务族 golden 分发：按 task 名前缀匹配，参数从 metric.params 读"""
+    name = task["task"]
+    params = task["metric"].get("params", {})
+    if name.startswith("crc"):
+        return _golden_crc(rows, params)
+    if name.startswith("llr_"):
+        return _golden_llr(rows, params)
+    if name.startswith("atan2"):
+        return _golden_atan2(rows, params)
+    if name.startswith("mfilt"):
+        return _golden_mfilt(rows, params)
+    if name.startswith("fir_"):
+        return _golden_fir(rows, params["coefficients"])
+    if name.startswith("nco_"):
+        return _golden_nco_scaled(rows, params)
+    if name.startswith("cmul_"):
+        return _golden_cmul(rows)
+    raise ValueError(f"no golden for task '{name}'")
+
+
 def _golden_for_task(task: dict, rows: List[List[int]]) -> np.ndarray:
-    """金标分发：fir 需要任务卡中的连续系数，其余查注册表"""
+    """金标分发：v1 精任务查注册表；fir 需系数；v2 族按前缀分发"""
     name = task["task"]
     if name == "fir":
         h = task["metric"]["params"]["coefficients"]
         return _golden_fir(rows, h)
     impl = _GOLDEN_IMPLS.get(name)
-    if impl is None:
-        raise ValueError(f"no golden impl for task '{name}'")
-    return impl(rows)
+    if impl is not None:
+        return impl(rows)
+    # v2 生成族：前缀分发
+    return _golden_family_dispatch(task, rows)
 
 
 def _simulate(
@@ -518,7 +765,8 @@ def _simulate(
             return None, log
 
         out_widths = [p["width"] for p in task["io_protocol"]["outputs"]]
-        dut = _read_outputs(Path(workdir) / "output.txt", out_widths)
+        out_signed = [bool(p.get("signed", True)) for p in task["io_protocol"]["outputs"]]
+        dut = _read_outputs(Path(workdir) / "output.txt", out_widths, out_signed)
         if dut is None or dut.shape[0] < n_samples:
             n_got = 0 if dut is None else dut.shape[0]
             return None, f"incomplete output: got {n_got}/{n_samples} samples"
@@ -534,6 +782,10 @@ def _simulate(
         mtype = task["metric"]["type"] if metric_mode == "task" else "sqnr"
         if mtype == "sfdr":
             precision = _sfdr_db(dut, task["metric"].get("params", {}))
+        elif mtype == "exact_match":
+            # 逐样本位精确：全部一致 → 999（满格哨兵），否则 0
+            max_abs = float(np.max(np.abs(ref - dut))) if ref.shape == dut.shape else 1e9
+            precision = SQNR_CAP_DB if (ref.shape == dut.shape and max_abs == 0.0) else 0.0
         else:
             precision = _sqnr_db(ref, dut)
         thr = (received / cycles) if cycles > 0 else 0.0
@@ -592,7 +844,9 @@ def _evaluate_stage1_impl(program_path: str) -> EvaluationResult:
             "(module top, ports, valid/ready semantics).",
         )
     smoke_sqnr = result["sqnr_db"]
-    combined = min(max(smoke_sqnr / 60.0, 0.0), 1.0)
+    # 封顶 0.49：stage2 超时/失败时 stage1 分数不得成为"幻影最优"
+    # （合法 stage2 评估分 ≥ 0.5；级联网关阈值 0.2 不受影响）
+    combined = min(max(smoke_sqnr / 60.0, 0.0), 1.0) * 0.49
     return EvaluationResult(
         metrics={
             "stage1_passed": 1.0,
@@ -638,22 +892,33 @@ def _evaluate_stage2_impl(program_path: str) -> EvaluationResult:
     if area is None:
         return _error_result("synth_fail", synth_err, "Check synthesizability (synth_ice40).")
 
+    # Nangate45 ASIC 主口径（不进网格维度，避免破坏存量 checkpoint 的 LUT 坐标；
+    # 正式实验时可直接切 feature_dimensions 到 area_um2）
+    with tempfile.TemporaryDirectory(prefix="commdsp_asic_") as asic_dir:
+        area_um2, asic_err = _run_yosys_asic(
+            asic_dir, str(Path(program_path).resolve()), synth_timeout
+        )
+
     sqnr = result["sqnr_db"]
     thr = result["throughput"]
     combined = _combined_score(sqnr, area, thr)
+    metrics = {
+        "precision": round(sqnr, 4),
+        "area": float(area),
+        "throughput": round(thr, 6),
+        "combined_score": combined,
+    }
+    if area_um2 is not None:
+        metrics["area_um2"] = round(area_um2, 2)
     return EvaluationResult(
-        metrics={
-            "precision": round(sqnr, 4),
-            "area": float(area),
-            "throughput": round(thr, 6),
-            "combined_score": combined,
-        },
+        metrics=metrics,
         artifacts={
             "sqnr_db": f"{sqnr:.2f}",
             "area_lut": str(area),
             "cell_counts": json.dumps(counts),
+            "area_um2": f"{area_um2:.2f}" if area_um2 is not None else (f"asic_fail: {asic_err[-200:]}" if asic_err else "n/a"),
             "cycles": str(result["cycles"]),
-            "note": "area = ice40 LUT+CARRY (PoC proxy; Nangate45 to come)",
+            "note": "area = ice40 LUT (grid dim); area_um2 = Nangate45 45nm ASIC (paper metric)",
         },
     )
 

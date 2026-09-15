@@ -32,10 +32,12 @@ PYTHON = sys.executable
 
 # 每任务归一化常数（HV 计算用；精度上限 dB 与面积参考 LUT）
 TASK_NORM: Dict[str, Dict[str, float]] = {
-    "cmul": {"prec": 120.0, "area": 8000.0},
-    "cordic_sincos": {"prec": 120.0, "area": 3000.0},
-    "nco": {"prec": 120.0, "area": 3000.0},
-    "fir": {"prec": 120.0, "area": 10000.0},
+    # area = ice40 LUT（当前网格维度）；area_asic = Nangate45 μm²（论文主口径，
+    # 2026-09-14 实测基线校准：cmul 8787 / cordic 497 / nco 633 / fir 12732）
+    "cmul": {"prec": 120.0, "area": 8000.0, "area_asic": 10000.0},
+    "cordic_sincos": {"prec": 120.0, "area": 3000.0, "area_asic": 3000.0},
+    "nco": {"prec": 120.0, "area": 3000.0, "area_asic": 3000.0},
+    "fir": {"prec": 120.0, "area": 10000.0, "area_asic": 15000.0},
 }
 
 

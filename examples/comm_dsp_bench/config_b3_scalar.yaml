@@ -1,0 +1,33 @@
+# B3 基线：标量-二值口径（EvolVE/REvolution 共同特征）
+# 与 ours-C 组的唯一差异 = 评估器（evaluator_scalar.py）；搜索机制完全相同（混合模式）
+random_seed: 42
+max_iterations: 40
+checkpoint_interval: 10
+log_level: "INFO"
+language: "verilog"
+llm:
+  manual_mode: true
+  primary_model: "qoder-manual-b3"
+  primary_model_weight: 1.0
+  temperature: 0.9
+  max_tokens: 16384
+prompt:
+  num_top_programs: 3
+  num_diverse_programs: 2
+database:
+  population_size: 40
+  archive_size: 24
+  num_islands: 2
+  # 竞品无精度 Pareto 维度：退化为框架默认（complexity, diversity）
+  elite_selection_ratio: 0.2
+  exploration_ratio: 0.3
+  exploitation_ratio: 0.7
+evaluator:
+  cascade_evaluation: true
+  cascade_thresholds: [0.2]
+  timeout: 300
+  parallel_evaluations: 2
+diff_based_evolution: true
+full_rewrite_probability: 0.5
+allow_full_rewrites: true
+max_code_length: 20000

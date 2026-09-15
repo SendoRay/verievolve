@@ -1,0 +1,45 @@
+# CommDSP-Bench 结构跳变实验配置（manual 模式，全重写通道）
+# 假设检验：diff 变异困在 76.9 dB 算法类内 → 全重写变异能否跳到 90+ dB
+# 续跑自 output_cordic_200/checkpoints/checkpoint_240（迭代 240 起）
+
+max_iterations: 256          # 240 + 16 个全重写迭代
+checkpoint_interval: 4
+log_level: "INFO"
+
+language: "verilog"
+
+llm:
+  manual_mode: true
+  primary_model: "qoder-manual-jump"
+  primary_model_weight: 1.0
+  temperature: 0.9
+  max_tokens: 16384
+
+prompt:
+  num_top_programs: 3
+  num_diverse_programs: 2
+  use_template_stochasticity: true
+
+database:
+  population_size: 40
+  archive_size: 24
+  num_islands: 2
+  feature_dimensions: ["precision", "area", "throughput"]
+  feature_bins:
+    precision: 8
+    area: 8
+    throughput: 4
+  elite_selection_ratio: 0.2
+  exploration_ratio: 0.4     # 提高探索比（结构跳变实验）
+  exploitation_ratio: 0.6
+
+evaluator:
+  cascade_evaluation: true
+  cascade_thresholds: [0.2]
+  timeout: 300
+  parallel_evaluations: 2
+
+# 关键开关：关闭 diff 模式 → 所有变异走全重写模板（结构跳变通道）
+diff_based_evolution: false
+allow_full_rewrites: true
+max_code_length: 20000

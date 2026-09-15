@@ -6,6 +6,7 @@ import asyncio
 import logging
 import multiprocessing as mp
 import pickle
+import random
 import signal
 import time
 from concurrent.futures import Future, ProcessPoolExecutor
@@ -88,6 +89,11 @@ def _worker_init(config_dict: dict, evaluation_file: str, parent_env: dict = Non
         },
     )
     _worker_evaluation_file = evaluation_file
+
+    # Per-iteration mode sampling RNG for full_rewrite_probability (mixed mode)
+    global _worker_rng
+    _seed = config_dict.get("random_seed") or 0
+    _worker_rng = random.Random((_seed << 16) ^ os.getpid())
 
     # These will be lazily initialized on first use
     _worker_evaluator = None
@@ -178,6 +184,13 @@ def _run_iteration_worker(
             parent_changes_desc = None
             child_changes_desc = None
 
+        # Per-iteration evolution mode: with full_rewrite_probability, a
+        # diff-based run samples a full-rewrite iteration (structural jump channel)
+        use_full_rewrite = (not _worker_config.diff_based_evolution) or (
+            getattr(_worker_config, "full_rewrite_probability", 0.0) > 0.0
+            and _worker_rng.random() < _worker_config.full_rewrite_probability
+        )
+
         prompt = _worker_prompt_sampler.build_prompt(
             current_program=parent.code,
             parent_program=parent.code,
@@ -187,7 +200,7 @@ def _run_iteration_worker(
             inspirations=[p.to_dict() for p in inspirations],
             language=_worker_config.language,
             evolution_round=iteration,
-            diff_based_evolution=_worker_config.diff_based_evolution,
+            diff_based_evolution=not use_full_rewrite,
             program_artifacts=parent_artifacts,
             feature_dimensions=db_snapshot.get("feature_dimensions", []),
             current_changes_description=parent_changes_desc,
@@ -211,8 +224,8 @@ def _run_iteration_worker(
         if llm_response is None:
             return SerializableResult(error="LLM returned None response", iteration=iteration)
 
-        # Parse response based on evolution mode
-        if _worker_config.diff_based_evolution:
+        # Parse response based on this iteration's evolution mode
+        if not use_full_rewrite:
             from openevolve.utils.code_utils import (
                 apply_diff,
                 apply_diff_blocks,
@@ -443,6 +456,7 @@ class ProcessParallelController:
             "log_dir": config.log_dir,
             "random_seed": config.random_seed,
             "diff_based_evolution": config.diff_based_evolution,
+            "full_rewrite_probability": getattr(config, "full_rewrite_probability", 0.0),
             "max_code_length": config.max_code_length,
             "language": config.language,
             "file_suffix": self.file_suffix,

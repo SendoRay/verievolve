@@ -1,0 +1,28 @@
+max_iterations: 2
+checkpoint_interval: 2
+log_level: "INFO"
+language: "verilog"
+llm:
+  manual_mode: true
+  primary_model: "qoder-manual-mixed"
+  primary_model_weight: 1.0
+  temperature: 0.9
+  max_tokens: 16384
+prompt:
+  num_top_programs: 3
+  num_diverse_programs: 2
+database:
+  population_size: 40
+  archive_size: 24
+  num_islands: 1
+  feature_dimensions: ["precision", "area", "throughput"]
+  feature_bins: {precision: 8, area: 8, throughput: 4}
+evaluator:
+  cascade_evaluation: true
+  cascade_thresholds: [0.2]
+  timeout: 300
+  parallel_evaluations: 2
+diff_based_evolution: true
+full_rewrite_probability: 0.5
+allow_full_rewrites: true
+max_code_length: 20000

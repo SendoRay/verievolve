@@ -1,0 +1,49 @@
+# CommDSP-Bench 生成实例（任务族第二层）：nco_p24_t256
+# 由 task_family_gen.py 自动生成；golden/激励由 evaluator 按 family 分发
+
+spec_version: 2
+task: nco_p24_t256
+
+spec: |
+  实现数控振荡器：24 位相位累加器 + sin 输出（16 位 Q1.15）。
+  FCW 为 24 位无符号，归一化频率 = fcw/2^24；每输入握手拍相位累加 FCW
+  并输出 sin(2*pi*phase/2^24)。
+
+  表深 256 点仅为基线实现参考（直接 256 点最近邻表）——实现方式完全
+  自由（对称压缩/插值/CORDIC 等），频谱纯度按 SFDR 评估
+  （worst-case，7 段 FCW 扫描，见 metric.params）。
+
+dut_module: top
+
+io_protocol:
+  base: stream_v1
+  inputs:
+    - {name: fcw, width: 24, signed: false, format: 'unsigned'}
+  outputs:
+    - {name: sin_out, width: 16, signed: true, format: 'signed Q1.15'}
+  extensions: []
+
+golden:
+  stimulus:
+    distribution: nco_fcw_sequence
+    samples: 57344
+    seed: fresh_per_eval
+  reference:
+    impl: "float64（evaluator 按 family 注册分发，参数见 metric.params）"
+
+metric:
+  type: sfdr
+  params:
+    phase_bits: 24
+    baseline_table: 256
+    fcws: [179, 392, 780, 1600, 3400, 5600, 7900]
+    segment_len: 8192
+    transient: 64
+    mainlobe_bins: 8
+
+constraints: {}
+
+timeouts:
+  L1: 5
+  L2_sim: 30
+  L2_synth: 300
