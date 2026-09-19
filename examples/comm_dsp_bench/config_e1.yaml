@@ -1,0 +1,52 @@
+# CommDSP-Bench E1 实验配置（DeepSeek 后端，混合进化模式）
+# Arm S（采样适应度基线）：真 LLM = deepseek-flash，评估 = 现有 fresh-seed 采样 SQNR
+# key 从环境变量 DEEPSEEK_API_KEY 读取（.api_key_deepseek，已 gitignore）
+
+max_iterations: 40
+checkpoint_interval: 10
+log_level: "INFO"
+
+language: "verilog"
+
+llm:
+  api_base: "https://api.deepseek.com"
+  api_key: "${DEEPSEEK_API_KEY}"
+  primary_model: "deepseek-flash"
+  primary_model_weight: 1.0
+  temperature: 0.8
+  max_tokens: 32768   # deepseek-flash 思维链消耗 ~10K token，8K 会截断正文（根因已验证）
+  timeout: 300
+  retries: 2
+  extra_body:
+    thinking:
+      type: enabled
+
+prompt:
+  num_top_programs: 3
+  num_diverse_programs: 2
+  use_template_stochasticity: true
+
+# MAP-Elites：精度-面积-吞吐 三维 Pareto 网格
+database:
+  population_size: 40
+  archive_size: 24
+  num_islands: 2
+  feature_dimensions: ["precision", "area", "throughput"]
+  feature_bins:
+    precision: 8
+    area: 8
+    throughput: 4
+  elite_selection_ratio: 0.2
+  exploration_ratio: 0.3
+  exploitation_ratio: 0.7
+
+evaluator:
+  cascade_evaluation: true
+  cascade_thresholds: [0.2]
+  timeout: 300
+  parallel_evaluations: 2
+
+# v0.4 消融结论：混合(50%) > 全重写 > diff-only，两臂统一用最优机制
+diff_based_evolution: true
+full_rewrite_probability: 0.5
+max_code_length: 20000

@@ -208,7 +208,9 @@ endmodule
 
 # 更简单的实现：用 generate 展开系数
 def mfilt_baseline2(L: int, S: list) -> str:
-    sarr = ", ".join((f"-16'sd{abs(v)}" if v < 0 else f"16'sd{v}") for v in S)
+    sarr = "\n".join(
+        f"                9'd{k}: seqf = " + (f"-16'sd{abs(v)}" if v < 0 else f"16'sd{v}") + ";"
+        for k, v in enumerate(S))
     return f"""// 参数化基线：匹配滤波直接型（{L} tap，乘法器版，朴素）
 module top (
     input  wire               clk,
@@ -223,7 +225,15 @@ module top (
     output reg  signed [23:0] c_im
 );
     // EVOLVE-BLOCK-START
-    localparam signed [15:0] SEQ [0:{L - 1}] = {{{sarr}}};
+    function signed [15:0] seqf;
+        input [8:0] k;
+        begin
+            case (k)
+{sarr}
+                default: seqf = 16'sd0;
+            endcase
+        end
+    endfunction
     reg signed [15:0] di [0:{L - 1}];
     reg signed [15:0] dq [0:{L - 1}];
     integer k;
@@ -232,8 +242,8 @@ module top (
     always @(*) begin
         acci = 0; accq = 0;
         for (k = 0; k < {L}; k = k + 1) begin
-            acci = acci + (di[k] * SEQ[k]);
-            accq = accq + (dq[k] * SEQ[k]);
+            acci = acci + (di[k] * seqf(k[8:0]));
+            accq = accq + (dq[k] * seqf(k[8:0]));
         end
     end
 
@@ -265,9 +275,9 @@ endmodule
 
 def fir_baseline(taps: int, h: list) -> str:
     hq = [int(round(x * 32768)) for x in h]
-    prods = [f"    wire signed [31:0] p0  = x    * {hq[0] if hq[0] >= 0 else '-' + str(abs(hq[0]))}"]
-    # localparam 数组版本（简洁）
-    harr = ", ".join(f"16'sd{v}" if v >= 0 else f"-16'sd{abs(v)}" for v in hq)
+    harr = "\n".join(
+        f"                8'd{k}: hf = " + (f"16'sd{v}" if v >= 0 else f"-16'sd{abs(v)}") + ";"
+        for k, v in enumerate(hq))
     return f"""// 参数化基线：直接型 FIR（{taps} 抽头，朴素）
 module top (
     input  wire               clk,
@@ -280,14 +290,22 @@ module top (
     output reg  signed [39:0] y
 );
     // EVOLVE-BLOCK-START
-    localparam signed [15:0] H [0:{taps - 1}] = {{{harr}}};
+    function signed [15:0] hf;
+        input [7:0] k;
+        begin
+            case (k)
+{harr}
+                default: hf = 16'sd0;
+            endcase
+        end
+    endfunction
     reg signed [15:0] d [0:{taps - 1}];
     integer k;
     reg signed [39:0] acc;
     always @(*) begin
         acc = 0;
         for (k = 0; k < {taps}; k = k + 1)
-            acc = acc + (d[k] * H[k]);
+            acc = acc + (d[k] * hf(k[7:0]));
     end
     assign in_ready = !out_valid || out_ready;
     always @(posedge clk) begin
@@ -323,10 +341,7 @@ def nco_baseline(pw: int, tbl: int) -> str:
         v = max(-32767, min(32767, round(v)))
         entries.append(f"{tbl_bits}'d{k}: T = " + (f"-16'sd{abs(v)}" if v < 0 else f"16'sd{v}"))
     # 打包每行 4 项
-    rows = []
-    for k in range(0, N, 4):
-        rows.append("                " + ", ".join(f"{entries[k+j]}" for j in range(min(4, N - k))) + ";")
-    case_body = "\n".join(rows)
+    case_body = "\n".join(f"                {e};" for e in entries)
     return f"""// 参数化基线：NCO 相位累加 + {N} 点最近邻表（朴素）
 module top (
     input  wire               clk,
@@ -377,15 +392,18 @@ endmodule
 
 def cmul_baseline(w: int, rnd: str) -> str:
     ow = (2 * w + 1) if rnd == "free" else w
-    out_assign = f"y_re <= (a * c - b * d){'' if rnd == 'free' else ''};"
     if rnd == "free":
-        body = "y_re <= a * c - b * d; y_im <= a * d + b * c;"
-    elif rnd == "round":
-        body = f"""y_re <= sat_r((a * c - b * d) >>> {w - 1}, ((a * c - b * d) >> {w - 2}) & 1);
-                   y_im <= sat_r((a * d + b * c) >>> {w - 1}, ((a * d + b * c) >> {w - 2}) & 1);"""
-    else:  # trunc
-        body = f"y_re <= (a * c - b * d) >>> {w - 1}; y_im <= (a * d + b * c) >>> {w - 1};"
-    # 简化：round/trunc 用移位即可（free 是全精度）
+        satf = ""
+    else:
+        satf = f"""
+    function signed [{ow - 1}:0] satw;
+        input signed [{2 * w + 1}:0] v;
+        begin
+            if (v > {2 * w + 1}'sd{(1 << (ow - 1)) - 1}) satw = -{ow}'sd{(1 << (ow - 1)) - 1};
+            else if (v < -{2 * w + 1}'sd{(1 << (ow - 1))}) satw = {ow}'sd{(1 << (ow - 1))};
+            else satw = v[{ow - 1}:0];
+        end
+    endfunction"""
     return f"""// 参数化基线：复数乘法 4 乘法器（{w} 位，{rnd}）
 module top (
     input  wire               clk,
@@ -402,6 +420,7 @@ module top (
     output reg  signed [{ow - 1}:0] y_im
 );
     // EVOLVE-BLOCK-START
+{satf}
     assign in_ready = !out_valid || out_ready;
     always @(posedge clk) begin
         if (!rst_n) begin
@@ -409,7 +428,9 @@ module top (
         end else begin
             if (out_valid && out_ready) out_valid <= 1'b0;
             if (in_valid && in_ready) begin
-                {"y_re <= a * c - b * d; y_im <= a * d + b * c;" if rnd == "free" else f"y_re <= (a * c - b * d) >>> {w - 1}; y_im <= (a * d + b * c) >>> {w - 1};"}
+                {"y_re <= a * c - b * d; y_im <= a * d + b * c;" if rnd == "free" else
+                 (f"y_re <= satw((a * c - b * d) >>> {w - 1}); y_im <= satw((a * d + b * c) >>> {w - 1});" if rnd == "trunc" else
+                  f"y_re <= satw((a * c - b * d + {2 ** (w - 2)}) >>> {w - 1}); y_im <= satw((a * d + b * c + {2 ** (w - 2)}) >>> {w - 1});")}
                 out_valid <= 1'b1;
             end
         end
