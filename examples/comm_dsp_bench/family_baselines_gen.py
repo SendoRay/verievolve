@@ -239,11 +239,13 @@ module top (
     integer k;
     reg signed [23:0] acci, accq;
 
+    // c[n] = Σ_k S[k]·r(n−k)：当前输入为 r(n)，di[k−1] 为 r(n−k)
     always @(*) begin
-        acci = 0; accq = 0;
-        for (k = 0; k < {L}; k = k + 1) begin
-            acci = acci + (di[k] * seqf(k[8:0]));
-            accq = accq + (dq[k] * seqf(k[8:0]));
+        acci = i_in * seqf(9'd0);
+        accq = q_in * seqf(9'd0);
+        for (k = 1; k < {L}; k = k + 1) begin
+            acci = acci + (di[k-1] * seqf(k[8:0]));
+            accq = accq + (dq[k-1] * seqf(k[8:0]));
         end
     end
 
@@ -302,10 +304,11 @@ module top (
     reg signed [15:0] d [0:{taps - 1}];
     integer k;
     reg signed [39:0] acc;
+    // y[n] = Σ_k h[k]·x(n−k)：当前输入为 x(n)，d[k−1] 为 x(n−k)
     always @(*) begin
-        acc = 0;
-        for (k = 0; k < {taps}; k = k + 1)
-            acc = acc + (d[k] * hf(k[7:0]));
+        acc = x * hf(8'd0);
+        for (k = 1; k < {taps}; k = k + 1)
+            acc = acc + (d[k-1] * hf(k[7:0]));
     end
     assign in_ready = !out_valid || out_ready;
     always @(posedge clk) begin

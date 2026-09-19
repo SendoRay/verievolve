@@ -78,7 +78,9 @@ def eval_one(fam: str, inst: str, inst_dir: Path) -> dict:
             a = out.split("artifacts:", 1)[1]
             rec["metrics"] = json.loads(m)
             rec["artifacts"] = json.loads(a)
-            rec["ok"] = rec["metrics"].get("combined_score", 0.0) > 0.0
+            rec["ok"] = (rec["metrics"].get("combined_score", 0.0) > 0.0
+                          and float(rec.get("artifacts", {}).get("smoke_sqnr_db", "0") or 0) >= 20.0
+                          ) or rec["metrics"].get("precision", 0.0) >= 20.0
             if not rec["ok"]:
                 rec["error_type"] = rec["artifacts"].get("error_type", "zero_score")
                 rec["error"] = rec["artifacts"].get("error_message", "")[:300]

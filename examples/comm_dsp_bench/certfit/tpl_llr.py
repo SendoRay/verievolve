@@ -47,8 +47,8 @@ def _sigma2() -> float:
 def validate(p: Dict) -> Tuple[bool, str]:
     if p.get("metric") not in ("l2", "l1"):
         return False, f"metric={p.get('metric')} 非法"
-    if int(p.get("corr_entries", 0)) not in (0, 16, 64, 256, 1024):
-        return False, f"corr_entries={p.get('corr_entries')} 非法"
+    if int(p.get("corr_entries", 0)) != 0:
+        return False, "corr_entries>0 的校正路径 RTL 尚待修复（已知问题，见论文附录）；当前仅开放 max-log"
     if not isinstance(p.get("corr_frac", 8), int) or not (6 <= p["corr_frac"] <= 12):
         return False, f"corr_frac={p.get('corr_frac')} 越界 [6,12]"
     if not isinstance(p.get("input_trunc", 4), int) or not (0 <= p["input_trunc"] <= 6):
