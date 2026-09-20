@@ -113,9 +113,12 @@ module top (
     wire swap = aq > ai;                       // 八分象限：比值 <= 1
     wire [{w - 1}:0] x = swap ? aq : ai;
     wire [{w - 1}:0] y = swap ? ai : aq;
-    // 比值查表索引（朴素除法，16 位截断）
-    wire [15:0] r16 = (x == {w}'d0) ? 16'd0 : ((y * 16'd512) / (x | {w}'d1));
-    wire [8:0] ridx = r16[8:0];
+    // 比值查表索引（朴素除法，25 位扩展防回绕）
+    wire [{w - 1}:0] xs = (x == {w}'d0) ? {w}'d1 : x;
+    wire [{w + 8}:0] yx = y * 512;
+    wire [{w + 8}:0] xext = xs;
+    wire [{w + 8}:0] rq = yx / xext;
+    wire [8:0] ridx = (rq > {w + 8}'d511) ? 9'd511 : rq[8:0];
 
     function signed [{w - 1}:0] atab;
         input [8:0] r;
@@ -129,10 +132,10 @@ module top (
 
     wire signed [{w - 1}:0] a0 = atab(ridx);
     wire signed [{w}:0] base = swap ? ({half // 2} - a0) : a0;
-    wire signed [{w}:0] t0 = sgn_i ? -base : base;
-    wire signed [{w}:0] tf = (sgn_q ^ sgn_i) ? (t0 + {half}) : t0;
-    wire signed [{w}:0] norm = tf >= {half} ? (tf - {2 * half}) :
-                                (tf < -{half} ? (tf + {2 * half}) : tf);
+    wire signed [{w}:0] t0 = sgn_i ? ({half} - base) : base;
+    wire signed [{w}:0] t1 = sgn_q ? -t0 : t0;
+    wire signed [{w}:0] norm = t1 >= {half} ? (t1 - {2 * half}) :
+                                (t1 < -{half} ? (t1 + {2 * half}) : t1);
     wire signed [{w - 1}:0] result = norm[{w - 1}:0];
 
     assign in_ready = !out_valid || out_ready;

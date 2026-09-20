@@ -93,10 +93,14 @@ def _emul_lut(z: np.ndarray, N: int, order: str):
             s2 = T[np.clip(mi + 2, 0, S + 1)]
             a1 = s1 - s0
             a2 = s2 - 2 * s1 + s0
+            # RTL 将 a2 截断为 8 位有符号（design_gen 的 a2[7:0]）：
+            # 深表时 |a2| ≤ 19 无损；浅表（N=64）时 |a2| 可达 ±315 → 回绕。
+            # 模型必须逐位复刻该截断（见论文 4.4 节"语义缝隙"案例）。
+            a2q = ((a2 & 0xFF) ^ 0x80) - 0x80
             lt = a1 * d
             lr = (lt >> fb) + ((lt >> (fb - 1)) & 1)
             qw = d * (d - fdiv)               # 可负
-            t2 = a2 * qw                      # |a2| ≤ 8（正弦四分之一波），8 位截断无损
+            t2 = a2q * qw
             qr = (t2 >> (2 * fb + 1)) + ((t2 >> (2 * fb)) & 1)
             y = s0 + lr + qr
         y = np.where(ngs == 1, -y, y)

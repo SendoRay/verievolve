@@ -51,8 +51,10 @@ def validate(p: Dict) -> Tuple[bool, str]:
         return False, "corr_entries>0 的校正路径 RTL 尚待修复（已知问题，见论文附录）；当前仅开放 max-log"
     if not isinstance(p.get("corr_frac", 8), int) or not (6 <= p["corr_frac"] <= 12):
         return False, f"corr_frac={p.get('corr_frac')} 越界 [6,12]"
-    if not isinstance(p.get("input_trunc", 4), int) or not (0 <= p["input_trunc"] <= 6):
-        return False, f"input_trunc={p.get('input_trunc')} 越界 [0,6]"
+    it = p.get("input_trunc", 4)
+    max_it = 4 if p.get("metric") == "l1" else 6  # L1 输出定标要求 it ≤ 4
+    if not isinstance(it, int) or not (0 <= it <= max_it):
+        return False, f"input_trunc={it} 越界 [0,{max_it}]"
     return True, "ok"
 
 

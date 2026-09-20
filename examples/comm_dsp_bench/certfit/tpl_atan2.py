@@ -37,6 +37,9 @@ def validate(p: Dict) -> Tuple[bool, str]:
         return False, f"interp={p.get('interp')} 非法"
     if not isinstance(p.get("div_frac"), int) or not (8 <= p["div_frac"] <= 16):
         return False, f"div_frac={p.get('div_frac')} 越界 [8,16]"
+    fb = int(math.log2(int(p["depth"])))
+    if p["div_frac"] < fb:
+        return False, f"div_frac={p['div_frac']} < log2(depth)={fb}（索引位不足）"
     return True, "ok"
 
 

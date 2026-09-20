@@ -78,6 +78,14 @@ def main():
             if not rd.exists():
                 continue
             for pt in front_points(rd):
+                if arm == "C" and pt["params"] is None and pt.get("code"):
+                    # checkpoint 会剪裁 artifacts → 从程序代码提取 PARAMS
+                    ns = {}
+                    try:
+                        exec(compile(pt["code"], "program.py", "exec"), ns)
+                        pt["params"] = ns.get("PARAMS")
+                    except Exception:
+                        pt["params"] = None
                 if arm == "C" and pt["params"] is not None:
                     tpl = _TPL[fam]
                     ok, msg = tpl.validate(pt["params"])

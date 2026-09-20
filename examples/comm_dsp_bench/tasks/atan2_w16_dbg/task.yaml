@@ -1,0 +1,44 @@
+# CommDSP-Bench 生成实例（任务族第二层）：atan2_w16
+# 由 task_family_gen.py 自动生成；golden/激励由 evaluator 按 family 分发
+
+spec_version: 2
+task: atan2_w16
+
+spec: |
+  实现复数辐角提取器：输入复数 (i_in, q_in)（16 位 signed Q1.15），
+  输出 atan2(q, i) 的定点角度 theta（16 位 signed 线性编码：
+  theta_val = theta/2^15 * pi，范围 [-pi, pi)）。
+
+  atan2 语义：输入象限完整保留（区别于折叠的 atan(q/i)）。原点附近行为
+  按 theta=0 处理即可（激励避免纯原点）。
+
+dut_module: top
+
+io_protocol:
+  base: stream_v1
+  inputs:
+    - {name: i_in, width: 16, signed: true, format: 'signed Q1.15'}
+    - {name: q_in, width: 16, signed: true, format: 'signed Q1.15'}
+  outputs:
+    - {name: theta, width: 16, signed: true, format: 'signed 线性角度码'}
+  extensions: []
+
+golden:
+  stimulus:
+    distribution: uniform_complex
+    samples: 65536
+    seed: fresh_per_eval
+  reference:
+    impl: "float64（evaluator 按 family 注册分发，参数见 metric.params）"
+
+metric:
+  type: sqnr
+  params:
+    width: 16
+
+constraints: {}
+
+timeouts:
+  L1: 5
+  L2_sim: 30
+  L2_synth: 300

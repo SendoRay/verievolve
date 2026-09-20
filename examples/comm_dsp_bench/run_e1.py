@@ -37,7 +37,7 @@ TASK_NORM = {
     "fir_t16_c25_sym": {"prec": 120.0, "area": 12000.0, "area_asic": 18000.0},
 }
 
-ARM_EVALUATOR = {"S": BENCH_DIR / "evaluator.py", "C": BENCH_DIR / "cert_evaluator.py"}
+ARM_EVALUATOR = {"S": BENCH_DIR / "evaluator.py", "C": BENCH_DIR / "cert_evaluator.py", "CS": BENCH_DIR / "e5_cs_evaluator.py"}
 
 
 def run_one(task: str, arm: str, seed: int, iterations: int, out_dir: Path,
@@ -56,7 +56,7 @@ def run_one(task: str, arm: str, seed: int, iterations: int, out_dir: Path,
         env["DEEPSEEK_API_KEY"] = key_file.read_text().strip()
 
     initial = BENCH_DIR / f"tasks/{task}/initial_program.v"
-    if arm == "C":
+    if arm in ("C", "CS"):
         initial = BENCH_DIR / f"certfit/{task}_template.py"
     cmd = [
         PYTHON, str(REPO_ROOT / "openevolve-run.py"),
@@ -73,7 +73,7 @@ def run_one(task: str, arm: str, seed: int, iterations: int, out_dir: Path,
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--task", required=True, choices=sorted(TASK_NORM.keys()))
-    ap.add_argument("--arm", default="S", choices=["S", "C"])
+    ap.add_argument("--arm", default="S", choices=["S", "C", "CS"])
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--iterations", type=int, default=40)
     ap.add_argument("--tag", default="e1")

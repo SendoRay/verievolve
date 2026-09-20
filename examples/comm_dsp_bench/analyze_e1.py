@@ -28,7 +28,37 @@ def front_of(run_dir: Path, prec_key="precision"):
         if m.get("combined_score", 0) > 0.5 and "precision" in m:
             pts.append((float(m["precision"]), float(m["area"]),
                         float(m.get("throughput", 0))))
-    return pareto_filter(pts)
+    return pareto_filter(dedup(pts))
+
+
+def dedup(pts):
+    seen, out = set(), []
+    for p in sorted(pts, key=lambda x: (x[1], -x[0])):
+        key = (round(p[0], 1), round(p[1]), round(p[2], 3))
+        if key not in seen:
+            seen.add(key)
+            out.append(p)
+    return out
+
+
+def hv_curve(run_dir: Path, norm):
+    """每个 checkpoint 的 HV（前沿去重后）。"""
+    ckpts = sorted((run_dir / "checkpoints").glob("checkpoint_*"),
+                   key=lambda p: int(p.name.split("_")[1]))
+    curve = []
+    for ck in ckpts:
+        pts = []
+        for pf in (ck / "programs").glob("*.json"):
+            d = json.loads(pf.read_text())
+            m = d.get("metrics", {})
+            if m.get("combined_score", 0) > 0.5 and "precision" in m:
+                pts.append((float(m["precision"]), float(m["area"]),
+                            float(m.get("throughput", 0))))
+        pts = dedup(pts)
+        front = pareto_filter(pts) if pts else []
+        curve.append({"iter": int(ck.name.split("_")[1]),
+                      "hv": round(hypervolume_3d(front, norm), 4) if front else 0.0})
+    return curve
 
 
 def main():
@@ -47,6 +77,7 @@ def main():
                 "n_front": len(front),
                 "front": [{"prec": round(p, 1), "area": int(a), "thr": round(t, 3)}
                           for p, a, t in sorted(front, key=lambda x: x[1])],
+                "hv_curve": hv_curve(rd, norm),
             }
     (OUT / "analysis.json").write_text(json.dumps(report, indent=2, ensure_ascii=False))
 
