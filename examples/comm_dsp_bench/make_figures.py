@@ -171,6 +171,30 @@ def fig_e4():
     plt.close(fig)
 
 
+def fig_scatter():
+    """图 4.3：证书-采样散点（平滑族 vs 重尾族）"""
+    d = load("e2b_scatter.json")
+    if not d:
+        return
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.6))
+    for ax, (task, title) in zip(axes, [("cordic_sincos", "cordic（平滑族，全枚举证书）"),
+                                        ("llr_64qam_snr20", "llr（重尾族，Sobol 证书）")]):
+        rows = [r for r in d.get(task, []) if r["sampled"] is not None]
+        xs = [r["cert"] for r in rows]
+        ys = [r["sampled"] for r in rows]
+        ax.scatter(xs, ys, s=36, c=C_C, alpha=0.85)
+        lim = [min(min(xs), min(ys)) - 5, max(max(xs), max(ys)) + 5]
+        ax.plot(lim, lim, "k--", lw=1)
+        ax.set_xlim(lim); ax.set_ylim(lim)
+        devs = [abs(y - x) for x, y in zip(xs, ys)]
+        ax.set_title(f"{title}\nmax |Δ| = {max(devs):.2f} dB")
+        ax.set_xlabel("证书 SQNR（L2 确定性）")
+        ax.set_ylabel("采样 SQNR（L1）")
+    fig.tight_layout()
+    fig.savefig(FIG / "fig4_3_scatter.png")
+    plt.close(fig)
+
+
 def fig_lemma():
     """图 4.1：模分解引理（精确） vs Sobol 收敛"""
     sys.path.insert(0, str(BENCH))
@@ -227,7 +251,8 @@ def fig_noise():
 if __name__ == "__main__":
     which = sys.argv[1] if len(sys.argv) > 1 else "all"
     todo = {"fronts": fig_fronts, "rejudge": fig_rejudge, "e3": fig_e3,
-            "e4": fig_e4, "lemma": fig_lemma, "noise": fig_noise}
+            "e4": fig_e4, "lemma": fig_lemma, "noise": fig_noise,
+            "scatter": fig_scatter}
     for name, fn in todo.items():
         if which in ("all", name):
             try:
