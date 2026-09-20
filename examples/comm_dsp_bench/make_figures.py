@@ -82,7 +82,12 @@ def fig_fronts():
         ax.set_title(label)
         ax.set_xlabel("面积（ice40 LUT）")
         ax.set_ylabel("SQNR（dB）")
-        ax.legend(fontsize=9)
+        # 999 = 精确哨兵：截断显示并在原高度标注
+        if any(p[0] >= 900 for p in front):
+            ax.annotate("999=精确（哨兵）", (0.98, 0.92), xycoords="axes fraction",
+                        ha="right", fontsize=8, color="gray")
+        ax.set_ylim(0, 125)
+        ax.legend(fontsize=9, loc="lower right")
     fig.suptitle("同一 LLM、同一预算（40 迭代）下两臂的精度-面积前沿", y=1.0)
     fig.tight_layout()
     fig.savefig(FIG / "fig5_1_fronts.png")

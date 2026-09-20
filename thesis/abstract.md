@@ -30,10 +30,11 @@
 中的进化在锚点任务上找到采样基线完全错过的精度可谈判点（57.2 dB/2804 LUT），
 在正余弦任务上第 5 次迭代跨越采样基线 40 次迭代未能突破的算法类地板
 （93.99 dB vs 75.6 dB，最终 96.0 dB/3648 LUT，且将低面积多周期 CORDIC 分支纳入
-同一前沿）；证书引导的等价类导航以约 1/3 的综合预算恢复全量前沿；以 BER 证书
+同一前沿）；机制消融将该优势分解为"搜索空间"因子（贡献算法类突破 +20.4 dB）与
+"适应度确定性"因子（贡献可复现性与零仿真评估代价）；以 BER 证书
 （含最坏情况裕度）替代 SQNR 门槛惯例选型匹配滤波器系数字宽可节省 66% 面积；
-机制消融将优势分解为"搜索空间"与"适应度确定性"两个因子，并诚实报告了重尾族
-上证书均值适应度的适用边界。
+机制实验同时给出两个诚实的负结果——证书引导的综合预算导航不优于随机（证书
+只解决验证、不解决成本预测），以及重尾族上证书均值适应度的适用边界。
 
 本文的全部实验数据、脚本与原始产物在开源仓库中可复现。
 
@@ -69,7 +70,9 @@ backend show that the certificate arm finds precision-negotiable points entirely
 by the sampled baseline (57.2 dB / 2804 LUT), breaks an algorithm-class floor in 5
 iterations that the baseline cannot break in 40 (93.99 dB vs 75.6 dB), and that
 BER-certificate word-length selection saves 66% area over the SQNR-threshold convention.
-All artifacts are open-sourced for reproducibility.
+A factor-isolating ablation attributes the algorithm-class breakthrough to the search-
+space factor (+20.4 dB) and reproducibility to the certificate factor; two honest
+negative results delineate the method's scope. All artifacts are open-sourced.
 
 **Key words**: large language models; automatic Verilog generation; communication DSP;
 fixed-point arithmetic; quality-diversity search; certificate-based evaluation; Pareto

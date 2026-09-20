@@ -26,11 +26,11 @@
 - 图 3.2 基线回归修复前后对比（fig3_2）
 - 图 4.1 模分解引理与确定性积分的一致性（fig4_1_lemma.png ✓）
 - 图 4.2 平滑族新鲜种子重评噪声（fig4_2_noise.png ✓）
-- 图 4.3 证书-采样散点：平滑族 vs 重尾族（fig4_3_scatter，数据 e2b_scatter.json）
-- 图 5.1 两臂 Pareto 前沿对比 2×2（fig5_1_fronts.png）
-- 图 5.2 重判一致性散点（fig5_2_rejudge.png）
-- 图 5.3 E3 综合预算-前沿质量曲线（fig5_3_e3_nav.png）
-- 图 5.4 E4 位宽决策：BER 证书 vs SQNR 门槛（fig5_4_e4_ber.png）
+- 图 4.3 证书-采样散点：平滑族 vs 重尾族（fig4_3_scatter.png ✓，数据 e2b_scatter.json）
+- 图 5.1 两臂 Pareto 前沿对比 2×2（fig5_1_fronts.png ✓）
+- 图 5.2 重判一致性散点（fig5_2_rejudge.png ✓）
+- 图 5.3 E3 综合预算-前沿质量曲线（fig5_3_e3_nav.png ✓）
+- 图 5.4 E4 位宽决策：BER 证书 vs SQNR 门槛（fig5_4_e4_ber.png ✓）
 
 ---
 

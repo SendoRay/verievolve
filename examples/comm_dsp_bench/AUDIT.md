@@ -65,9 +65,12 @@ scrambler 与 fft_64 两族（见 §5），fir_decim 列为 future work。**
 
 ## 5. 行动项
 
-- [x] 修复 fir/mfilt/nco 基线（E2 前置）
-- [x] atan2 基线复测（已与设计值一致）
+- [x] 修复 fir/mfilt/nco 基线（解包数组→case 函数、nco case 分隔符、mfilt/fir 滞后一拍）
+- [x] 修复 atan2 族基线（象限重构公式错误、`y*512` 字面量位宽回绕、w≥20 的 yx 位宽参数化）——w28 复测 71.74 dB
+- [x] 修复 cmul round/trunc 饱和缺失；**遗留**：w<33 实例 golden 刻度与输出格式不一致（DUT 输出 Q1.15 而 golden 全精度刻度，Δ=2^15）——需修任务卡或 golden 缩放，列为已知问题
+- [x] 回归判据收紧（冒烟 SQNR ≥ 20 dB 才算通过——修复了"stage1 跑通即通过"的漏洞）
+- [x] 最终回归 run5：82/106（残余 24 例全部定性：cmul 刻度问题 10、fir t64/t128 仿真超时 12、mfilt L127/255 超时 2）
+- [x] 证书模型-RTL 全空间逐位验证中发现并修复 a2[7:0] 截断缝隙（quad+depth64，见 ch4 §4.4）
 - [ ] 新增 scrambler 族（task_family_gen 扩展：c_init 参数化）
 - [ ] 新增 fft_64 族（golden=numpy.fft，基线=radix-2 DIT）
-- [ ] E2 全量回归 → 110/110（或如实报告不可修复子集）
-- [ ] 论文第 3 章按本审计组织"基准集设计与验证"小节
+- [ ] cmul 小字长实例 golden 刻度修复；流水线化 fir 大抽头基线

@@ -30,7 +30,7 @@ TASK_NORM = {
     "cmul_w16_free": {"prec": 120.0, "area": 8000.0, "area_asic": 10000.0},
     "cordic_sincos": {"prec": 120.0, "area": 3000.0, "area_asic": 3000.0},
     "atan2_w16": {"prec": 120.0, "area": 6000.0, "area_asic": 8000.0},
-    "llr_64qam_snr20": {"prec": 120.0, "area": 8000.0, "area_asic": 10000.0},
+    "llr_64qam_snr20": {"prec": 120.0, "area": 15000.0, "area_asic": 15000.0},
     "nco": {"prec": 120.0, "area": 3000.0, "area_asic": 3000.0},
     "nco_p24_t256": {"prec": 120.0, "area": 3000.0, "area_asic": 3000.0},
     "fir": {"prec": 120.0, "area": 10000.0, "area_asic": 15000.0},
