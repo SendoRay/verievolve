@@ -276,7 +276,7 @@ def fig_lemma():
     ax.plot(xs, sob, "s--", label="Sobol $2^{16}$（L2 确定性）")
     ax.set_xlabel("输出丢位 s（drop bits）")
     ax.set_ylabel("总体均值 SQNR（dB）")
-    ax.set_title("模分解引理与确定性积分的一致性（Δ ≤ 0.02 dB）")
+    ax.set_title("模分解引理与确定性积分的一致性（Δ ≤ 0.03 dB）")
     ax.legend()
     fig.tight_layout()
     fig.savefig(FIG / "fig4_1_lemma.png")

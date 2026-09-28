@@ -74,3 +74,30 @@ scrambler 与 fft_64 两族（见 §5），fir_decim 列为 future work。**
 - [ ] 新增 scrambler 族（task_family_gen 扩展：c_init 参数化）
 - [ ] 新增 fft_64 族（golden=numpy.fft，基线=radix-2 DIT）
 - [ ] cmul 小字长实例 golden 刻度修复；流水线化 fir 大抽头基线
+
+## 6. 2026-09-27 模分解引理误差矩修复（RESEARCH_PLAN §9.3 第 1 项）
+
+**问题**（只读复核结论：drop=1、half-up 穷举=0.375，旧 direct=0.21875、旧 karatsuba=0.2890625）：
+
+1. `certfit/common.py::_residue_dist`：`nu` 以 0 初始化，r=0（A≡0）被混入 ν=0
+   奇数残差类——t=0 时 mask 含 r=0 且分母多计。修复：r=0 置 ν=−1，不进任何类。
+2. `cmul_exact_err_moments` karatsuba 分支：把 P1=(a+b)(c+d) 当 17 位均匀乘积
+   并与 A、B 按独立项圆卷积。实际 P1−A−B = ad+bc（整数恒等式），ad⊥bc 且各与
+   ac 同分布，故两结构 im 误差矩必然相等。修复：karatsuba 分支与 direct 同式，
+   并新增 `nbits` 参数（默认 16）供小位宽对拍。
+
+**修复后影响量化**（引理 SQNR 口径）：
+- sd=1：direct +2.34 dB、karatsuba +1.13 dB（err2 由低估恢复到真值）
+- sd=2：恰好抵消，无变化
+- sd=3：−0.016 dB；sd≥4：<0.005 dB
+
+**受影响产物**：
+- `exact_lemma_sqnr`（仅 artifacts，不进适应度）：sd=1 的证书数值变化最大
+- 图 4.1（fig_lemma）：曲线覆盖 sd∈[2,15]，修复后引理 vs Sobol(2^16) 最大偏差
+  由 ≤0.02 dB 变为 ≤0.029 dB（增量来自 Sobol 有限点数离散误差，引理侧现为精确
+  值）——图与标题已再生，正文表 4.1/定理 4.1 声明同步改为 ≤0.03 dB
+- E1/E5 存量主结果：主 `precision` 走 Sobol 路径，不受本修复影响
+
+**新增回归**：`regression_cmul_moments.py`（R1 φ/量化器一致性、R2 残差分布
+频数对拍、R3 小位宽 nbits∈{4,5,6} 全枚举 vs helper 逐点一致、R4 结构等价、
+R5 锚点 0.375、R6 16 位蒙特卡罗抽查）。报告：`experiments_system/s0_model_fix/`。

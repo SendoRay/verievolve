@@ -113,13 +113,16 @@ def _residue_dist(s: int, nbits: int) -> np.ndarray:
     → a mod 2^s 均匀于 Z/2^s）。由 (ν(a),ν(c)) 赋值混合给出：
       ν(a)=j, ν(c)=k, j+k<s → r 均匀分布于 ν(r)=j+k 的残差类
       j+k ≥ s 或 a≡0 → r = 0
+    注意 r=0（A≡0）只接受 t≥s 的质量，不属于任何 ν=t>0 残差类，也不属于
+    ν=0 的奇数类（2026-09-27 修复：旧实现 nu 以 0 初始化，把 r=0 混入
+    ν=0 类，drop=1 时 E[e²] 给出 0.21875，全枚举真值为 0.375）。
     """
     if s > nbits - 1:
         raise ValueError(f"exact residue dist requires s <= nbits-1 ({s} > {nbits-1})")
     size = 1 << s
     r = np.arange(size, dtype=np.int64)
     lowbit = np.bitwise_and(r, -r)
-    nu = np.zeros(size, dtype=np.int64)
+    nu = np.full(size, -1, dtype=np.int64)  # r=0 无赋值，置 −1 不入任何残差类
     nz = r > 0
     nu[nz] = np.log2(lowbit[nz].astype(np.float64)).astype(np.int64)
 
@@ -156,7 +159,8 @@ def _circular_conv(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 
 def cmul_exact_err_moments(drop: int, mode: str = "rne",
-                           karatsuba: bool = False) -> Dict[str, float]:
+                           karatsuba: bool = False,
+                           nbits: int = 16) -> Dict[str, float]:
     """cmul 数据通路输出量化误差的精确矩（模分解引理，论文引理 4.1）。
 
     数据通路：乘积与累加在整数域精确，输出处一次性量化丢 `drop` 位。
@@ -164,21 +168,27 @@ def cmul_exact_err_moments(drop: int, mode: str = "rne",
     关键点：Q(v) 的误差只依赖 v mod 2^drop，而 v mod 2^drop 的分布是
     乘积残差分布的**圆卷积**（wraparound 使 φ(A−B) ≠ φ(A)−φ(B)）。
 
+    karatsuba 与 direct 的 im 误差矩**必然相等**：整数恒等式
+      P1 − A − B = (a+b)(c+d) − ac − bd = a·d + b·c = A' + B'
+    （中间结果精确、无溢出时逐位成立），a·d 与 b·c 依赖不相交的操作数、
+    相互独立且各与 ac 同分布。2026-09-27 修复：旧实现把 P1=(a+b)(c+d)
+    当作 17 位均匀乘积并与 A、B 按独立项卷积，忽略 P1 与 A、B 共享操作数
+    的相关性，drop=1 时给出 0.2890625（direct 0.21875），而全枚举真值为
+    0.375。回归见 regression_cmul_moments.py。
+
+    nbits：操作数字宽（均匀于 2^nbits 个连续整数），须满足 s ≤ nbits−1；
+    小位宽取值用于与全枚举对拍。
+
     返回 re/im 各自的 (E[e], E[e^2])，精确。
     """
     s = drop
     if s <= 0:
         return {"re_mean": 0.0, "re_mom2": 0.0, "im_mean": 0.0, "im_mom2": 0.0}
 
-    distA = _residue_dist(s, 16)          # 乘积 ac（16 位操作数）
-    distV2 = _circular_conv(distA, distA)  # A − B（或 A + B）
+    distA = _residue_dist(s, nbits)        # 乘积 ac
+    distV2 = _circular_conv(distA, distA)  # A − B（A'+B' 与之同分布）
     re_mean, re_mom2 = _phi_moments_over_dist(distV2, s, mode)
-    im_mean, im_mom2 = re_mean, re_mom2    # direct: im = A' + B' 同分布
-
-    if karatsuba:
-        distA17 = _residue_dist(s, 17)     # P1 = (a+b)(c+d)（17 位和）
-        distV3 = _circular_conv(_circular_conv(distA17, distA), distA)
-        im_mean, im_mom2 = _phi_moments_over_dist(distV3, s, mode)
+    im_mean, im_mom2 = re_mean, re_mom2    # direct 与 karatsuba 同分布，见 docstring
 
     return {"re_mean": re_mean, "re_mom2": re_mom2,
             "im_mean": im_mean, "im_mom2": im_mom2}
