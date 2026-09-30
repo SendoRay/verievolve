@@ -4,7 +4,7 @@
   algo:   "lut" | "cordic"
   order:  "nearest" | "linear" | "quad"      （仅 lut）
   depth:  LUT 全波表深 ∈ {64,128,256,512,1024}
-  stages: CORDIC 迭代级数 ∈ {8..20}           （仅 cordic）
+  stages: CORDIC 迭代级数 ∈ {7..20}           （仅 cordic）
 
 模型层级：
   precision    : 65536 角度码**全枚举**上的整数域逐位仿真——L2 层的
@@ -49,8 +49,8 @@ def validate(p: Dict) -> Tuple[bool, str]:
         return True, "ok"
     if p.get("algo") == "cordic":
         st = int(p.get("stages", 0))
-        if not (8 <= st <= 20):
-            return False, f"stages={st} 越界 [8,20]"
+        if not (7 <= st <= 20):
+            return False, f"stages={st} 越界 [7,20]"
         return True, "ok"
     return False, f"algo={p.get('algo')} 非法"
 

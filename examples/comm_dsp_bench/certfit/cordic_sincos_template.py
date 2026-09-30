@@ -4,7 +4,7 @@
   algo:   "lut" | "cordic"
   order:  "nearest" | "linear" | "quad"（lut）
   depth:  64/128/256/512/1024（lut 全波表深）
-  stages: 8..20（cordic 迭代级数）
+  stages: 7..20（cordic 迭代级数）
 
 证书字段：cert_mean_sqnr_db（确定性全枚举）、cert_wc_sqnr_db（最坏界）、
 area_lut（真实 Yosys 综合）。精度-面积-吞吐 Pareto 由 MAP-Elites 网格维持。

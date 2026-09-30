@@ -25,10 +25,20 @@ def prototype_taps() -> np.ndarray:
     return h / float(np.sum(h))
 
 
+def ideal_nco(f_off_mhz: float, n: int) -> tuple[np.ndarray, np.ndarray, int]:
+    """按冻结 32-bit FCW 生成理想 cos/sin 与整数 FCW。
+
+    FCW 量化是所有候选共享的接口条件，不应被计入候选实现误差。
+    """
+    fcw = int(round(f_off_mhz * 1e6 / spec.FS_IN * (1 << spec.W_P_ACC)))
+    theta = 2 * math.pi * fcw * np.arange(n, dtype=np.float64) / (1 << spec.W_P_ACC)
+    return np.cos(theta), np.sin(theta), fcw
+
+
 def mixer_ideal(x: np.ndarray, f_off_mhz: float, n: int) -> np.ndarray:
-    """理想混频：x·e^{−jθ}，θ_n = 2π·f_off·n/Fs_in。"""
-    theta = 2 * math.pi * f_off_mhz * 1e6 * np.arange(n) / spec.FS_IN
-    return x * np.exp(-1j * theta)
+    """理想混频：使用与候选相同的整数 FCW，计算 x·e^{-jθ_FCW}。"""
+    cos_i, sin_i, _ = ideal_nco(f_off_mhz, n)
+    return x * (cos_i - 1j * sin_i)
 
 
 def fir_float(x: np.ndarray, h: np.ndarray) -> np.ndarray:
@@ -49,11 +59,9 @@ def run_reference(sd: ScenarioData, h: np.ndarray | None = None):
     if h is None:
         h = prototype_taps()
     n = len(sd.x_adc)
-    theta = 2 * math.pi * sd.scen.f_off_mhz * 1e6 * np.arange(n) / spec.FS_IN
-    cos_i = np.cos(theta)
-    sin_i = np.sin(theta)
+    cos_i, sin_i, fcw = ideal_nco(sd.scen.f_off_mhz, n)
     mix = mixer_ideal(sd.x_adc, sd.scen.f_off_mhz, n)
     y_fir = fir_float(mix, h)
     y_out = y_fir[::spec.R]
-    return {"cos": cos_i, "sin": sin_i, "mix": mix, "y_fir": y_fir,
-            "y_out": y_out, "h": h}
+    return {"cos": cos_i, "sin": sin_i, "fcw": fcw, "mix": mix,
+            "y_fir": y_fir, "y_out": y_out, "h": h}

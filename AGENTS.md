@@ -358,3 +358,10 @@ python make_figures.py
 
 - 2026-09-28：建立。确立术语表（"证书"→"解析误差模型"）、目标口径（会议 + ≥80 页硕论）、
   证据纪律、评价器必修缺陷清单。代码改名与论文改写尚未执行。
+
+
+
+
+/Users/chengzhy/verievolve/Iknow.md 是我懂得，你需要在每一次有新的想法或者新增的内容的时候 或者相关的实验 精简一下补充进 /Users/chengzhy/verievolve/Iknow.md 
+
+适当的commit 推送到云端

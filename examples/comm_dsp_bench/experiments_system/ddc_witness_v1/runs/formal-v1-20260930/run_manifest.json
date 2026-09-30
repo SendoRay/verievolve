@@ -1,0 +1,62 @@
+{
+  "schema_version": "ddc-witness-results-v1",
+  "protocol": "WITNESS_FROZEN_DDC_v1",
+  "run_id": "formal-v1-20260930",
+  "execution_manifest": {
+    "path": "experiments_system/ddc_witness_v1/frozen_inputs_v1/execution_manifest.json",
+    "sha256": "f8dd20d3651e3e3ddb8dc0e0745f2bb9a3fc1dbf8d56e26800f6a7e28eec34e2"
+  },
+  "candidate_set_sha256": "bf49541537be9195da7dc1955d655a3f1679fa73967d73fb1075eb0a3215c662",
+  "reproducibility": {
+    "protocol_document": {
+      "path": "thesis/WITNESS_FROZEN_DDC_v1.md",
+      "sha256": "4b99fc24448c27bd04abb411f356efd87b52afd0975dfe146a684c894bd31c22"
+    },
+    "code_sha256": {
+      "chains/ddc/candidates.py": "0f250632f8409664dc0b83367825a258c79060c49ec5497c32ec9d748ea88e99",
+      "chains/ddc/fixed_chain.py": "ef046f08d78ed05abff94be3c8c506887d9316fc5ed5329d2a5df944d7ff35f6",
+      "chains/ddc/metrics.py": "af4be84f09f675c33218ece8b3ad599aee16bf72a15efb3b5bc91f8fdb30385a",
+      "chains/ddc/prepare_witness_v1.py": "cd21245ef229cbeb281fda6a355ab7a4631f6147c28bd5291d51185e172c07d8",
+      "chains/ddc/ref_chain.py": "4984a9bc6e47d10d97e78d09639be973ec3d369a1212b84240769d96439020bf",
+      "chains/ddc/rtl_gen.py": "b05d4a51c819284d47dbb62d1f4c3df88c197519a9778dfc377f04d06c07ef01",
+      "chains/ddc/run_witness_v1.py": "b16a4e45650be2fa37ec3f9098ad9c5ac58cdf212ef4c9cb8055170894bf1193",
+      "chains/ddc/scenarios.py": "aad25be9278ae8e4fe05be07aed0c4479edab598c640f233750095ec9c168fa1",
+      "chains/ddc/spec.py": "790f07ad9c9ecb6a6ed76f5f34d335f78293f55f71f8721fd4a60c382ddf10c6",
+      "certfit/tpl_cordic.py": "faa0d2e79f688c719f1a0104da09947c7dbf535ffa7c2b22a3ca70cd22083675"
+    },
+    "environment": {
+      "python": "3.10.8",
+      "platform": "macOS-15.4.1-arm64-arm-64bit",
+      "numpy": "2.2.6",
+      "scipy": "1.15.3"
+    },
+    "git": {
+      "head": "5a720e5e759dc3d1c2e040e87160e88cb5a8b5ac",
+      "working_tree_dirty": true
+    }
+  },
+  "synthesis_contract": {
+    "primary_scope": "NCO-only",
+    "primary_top_module": "nco_map",
+    "rtl_generator": "chains/ddc/rtl_gen.py::gen_nco_verilog",
+    "context_scope": "fixed full DDC; report only, not primary decision cost",
+    "context_top_module": "top",
+    "tool": {
+      "executable": "/opt/homebrew/bin/yosys",
+      "version": "Yosys 0.69+post (git sha1 143eb14f9cc55d6f8927e68523b0c9d2166ed02c, Release, AppleClang clang++ 17.0.0.17000604)"
+    },
+    "liberty": {
+      "path": "pdk/NangateOpenCellLibrary_typical.lib",
+      "sha256": "8d540a4d4cf6d09d27c87ad067857a9c0c2eeb023ab7a56e058cd3113db4e9b1",
+      "corner": "Nangate45 typical"
+    },
+    "script_template": "read_verilog {verilog}; synth -top nco_map -noabc; dffunmap; dfflibmap -liberty {liberty}; abc -liberty {liberty}; tee -o {log} stat -liberty {liberty}",
+    "script_sha256": "0ac48f7f96c381528764552690803fabd43afc42e0039b3a7e0460de80c1efa4",
+    "metric": "mapped Chip area for module nco_map (um^2)",
+    "sdc": null,
+    "timing_power_claims_allowed": false
+  },
+  "q_cal": 0.0,
+  "epsilon_Q": 2.32929922807541e-06,
+  "started_unix": 1790738647.1996028
+}

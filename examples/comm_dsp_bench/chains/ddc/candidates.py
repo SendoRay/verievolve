@@ -40,6 +40,35 @@ NCO_CANDIDATES = [
     {"name": "n6_cordic16_b16", "algo": "cordic", "stages": 16, "phase_bits": 16},
 ]
 
+# WITNESS_FROZEN_DDC_v1 §2.2：truth 前冻结的 v2 二十点池。
+# 这是独立于历史六点池的预注册集合；二者合并后是 decision witness 的
+# 26 个实现选择集。重复数值映射只在主 pair 选择时去重，面积/Pareto 仍保留。
+NCO_WITNESS_V2_CANDIDATES = [
+    *[
+        {"name": f"v2_lut{depth}near_b16", "algo": "lut", "order": "nearest",
+         "depth": depth, "phase_bits": 16}
+        for depth in (128, 256, 512, 1024)
+    ],
+    *[
+        {"name": f"v2_lut{depth}lin_b{phase_bits}", "algo": "lut", "order": "linear",
+         "depth": depth, "phase_bits": phase_bits}
+        for depth in (256, 1024)
+        for phase_bits in (8, 10, 12, 14, 16)
+    ],
+    *[
+        {"name": f"v2_cordic{stages}_b16", "algo": "cordic", "stages": stages,
+         "phase_bits": 16}
+        for stages in (7, 8, 9, 10, 11, 12)
+    ],
+]
+
+
+def witness_nco_candidates(include_legacy: bool = True) -> list[dict]:
+    """返回冻结 witness NCO 实现集；默认是 6+20 的 26 点并集。"""
+    configs = ([*NCO_CANDIDATES, *NCO_WITNESS_V2_CANDIDATES]
+               if include_legacy else NCO_WITNESS_V2_CANDIDATES)
+    return [dict(cfg) for cfg in configs]
+
 # ---------------------------------------------------------------------------
 # FIR 候选（8）：系数字长 × 累加位宽 × 乘积丢位 × 舍入
 #   wc: 系数量化位宽（Q(Wc−2).(Wc−2)）；wacc: 0=精确累加（int64）
@@ -124,6 +153,29 @@ def nco_static_metrics(nco_cfg: dict) -> dict:
               if nco_cfg["algo"] == "lut" else {"algo": "cordic", "stages": int(nco_cfg["stages"])})
     m = tpl_cordic.cert_metrics(params)
     return {"sqnr_static_db": m["precision"], "wc_db": m["precision_wc"]}
+
+
+def build_witness_nco_pool(include_legacy: bool = True) -> list[dict]:
+    """计算冻结 accumulator-domain ``M_core``，返回 26 点或纯 v2 20 点池。"""
+    from .metrics import nco_accumulator_metrics
+
+    out = []
+    for cfg in witness_nco_candidates(include_legacy=include_legacy):
+        m = nco_accumulator_metrics(cfg)
+        out.append({
+            **cfg,
+            "sqnr_static_db": m["sqnr_db"],  # run_s1 兼容字段；语义已是完整 M_core
+            "mcore_sqnr_db": m["sqnr_db"],
+            "mcore_wce_lsb": m["wce_lsb"],
+            "mcore_last_bit_accuracy": m["last_bit_accuracy"],
+            "raw_sqnr_db": m["raw_sqnr_db"],  # 未移除全局复标量（§3.1 敏感性）
+            "raw_wce_lsb": m["raw_wce_lsb"],
+            "raw_last_bit_accuracy": m["raw_last_bit_accuracy"],
+            "mcore_gain_re": m["gain_re"],
+            "mcore_gain_im": m["gain_im"],
+            "mcore_domain_size": m["domain_size"],
+        })
+    return out
 
 
 def check_mixer_overflow(cmul_cfg: dict) -> dict:

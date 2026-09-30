@@ -116,3 +116,6 @@ YAML-based configuration with hierarchical structure:
 - Black for code formatting
 - Artifacts threshold: Small (<10KB) stored in DB, large saved to disk
 - Process workers load database snapshots for true parallelism
+
+
+/Users/chengzhy/verievolve/Iknow.md 是我懂得，你需要在每一次有新的想法或者新增的内容的时候 或者相关的实验 精简一下补充进 /Users/chengzhy/verievolve/Iknow.md 

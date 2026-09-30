@@ -10,7 +10,9 @@ experiments_system/ 留存新旧 manifest（RESEARCH_PLAN §9.2 缓存键要求�
 
 from __future__ import annotations
 
+import hashlib
 import json
+import math
 import os
 from dataclasses import dataclass, field, asdict
 
@@ -43,7 +45,7 @@ F_OFF_GRID_MHZ = (0.39, 0.51, 0.63)
 #   alias: 落在抽取折叠区（混频后 0.55 MHz → 折叠回 0.45 MHz，输出带内）
 BLOCKER_OFFSET_MHZ = {"obb": (0.30, 0.42), "alias": (0.55,)}
 BLOCKER_REL_DB = (-3.0, +6.0)   # 相对信号功率（两档幅度）
-AWGN_SNR_DB = 30.0              # 通带内 AWGN
+AWGN_SNR_DB = 30.0              # 旧清单：逐样点全带 SNR；witness 清单：输出测量域 SNR（见 scenarios）
 
 N_SYM = 1600                    # 符号数 → 输入 12800 样点
 N_WARMUP_SYM = 64               # 前导/滤波器建立保护符号
@@ -81,6 +83,7 @@ class Scenario:
     blocker_rel_db: float    # 相对信号功率；clean 为 -inf
     snr_db: float
     seed: int
+    split: str = ""          # witness 场景集：main | heldout | stress；旧清单为空
 
     @property
     def has_blocker(self) -> bool:
@@ -135,6 +138,107 @@ def build_scenarios() -> list:
                 snr_db=AWGN_SNR_DB, seed=SEED_BASE + k))
             k += 1
     return scenarios
+
+
+# ---------------------------------------------------------------------------
+# witness 场景集（WITNESS_FROZEN_DDC_v1 §4.1；旧 build_scenarios 保留不动）
+# ---------------------------------------------------------------------------
+SCENARIO_VERSION = "ddc-witness-scen-v1"
+W_F_MAIN_MHZ = (0.390, 0.420, 0.450, 0.480, 0.510, 0.540, 0.570, 0.600, 0.630)
+W_F_HELDOUT_MHZ = (0.405, 0.435, 0.465, 0.495, 0.525, 0.555, 0.585, 0.615)
+W_OBB_MHZ = (0.300, 0.420)
+W_ALIAS_MHZ = 0.555
+W_REL_DB = -3.0
+W_STRESS_REL_DB = +6.0
+DECIM_PHASE = 0
+NCO_INIT_PHASE = 0
+
+
+def scenario_key(klass: str, f_off_mhz: float, blocker_off_mhz: float,
+                 blocker_rel_db: float, snr_db: float) -> str:
+    """完整场景键：含场景版本号，不含列表位置。"""
+    return (f"{SCENARIO_VERSION}|{SEED_BASE}|{klass}|f={f_off_mhz:.3f}|b={blocker_off_mhz:.3f}"
+            f"|r={blocker_rel_db:+.1f}|snr={snr_db:.1f}")
+
+
+def seed_from_key(key: str) -> int:
+    """由场景键稳定派生 seed（sha256 前 8 字节，落在 [0, 2^63)）。"""
+    return int.from_bytes(hashlib.sha256(key.encode("utf-8")).digest()[:8], "big") >> 1
+
+
+def _w_scen(split: str, klass: str, f: float, bo: float, rel: float) -> Scenario:
+    key = scenario_key(klass, f, bo, rel, AWGN_SNR_DB)
+    name = f"{klass}_f{round(f*1000)}" + ("" if klass == "clean" else
+                                          f"_b{round(bo*1000)}_r{rel:+.0f}")
+    return Scenario(name=name, klass=klass, f_off_mhz=f, blocker_off_mhz=bo,
+                    blocker_rel_db=rel, snr_db=AWGN_SNR_DB,
+                    seed=seed_from_key(key), split=split)
+
+
+def _w_template(split: str, f: float) -> list:
+    """四场景模板：clean + OBB 0.30 + OBB 0.42 + alias-edge 0.555（均 −3 dB）。"""
+    out = [_w_scen(split, "clean", f, 0.0, -999.0)]
+    out += [_w_scen(split, "obb", f, bo, W_REL_DB) for bo in W_OBB_MHZ]
+    out.append(_w_scen(split, "alias", f, W_ALIAS_MHZ, W_REL_DB))
+    return out
+
+
+def build_witness_scenarios(split: str | None = None) -> list:
+    """C_main 36 / C_heldout 32 / C_stress 9；split=None 返回三者按序拼接。"""
+    sets = {
+        "main": [s for f in W_F_MAIN_MHZ for s in _w_template("main", f)],
+        "heldout": [s for f in W_F_HELDOUT_MHZ for s in _w_template("heldout", f)],
+        "stress": [_w_scen("stress", "alias", f, W_ALIAS_MHZ, W_STRESS_REL_DB)
+                   for f in W_F_MAIN_MHZ],
+    }
+    if split is None:
+        return sets["main"] + sets["heldout"] + sets["stress"]
+    return sets[split]
+
+
+def fcw_of(f_off_mhz: float) -> int:
+    """整数 FCW = round(f/Fs·2^32)（与 fixed_chain / rtl_gen 同式）。"""
+    return int(round(f_off_mhz * 1e6 / FS_IN * (1 << W_P_ACC)))
+
+
+def fcw_info(f_off_mhz: float) -> dict:
+    fcw = fcw_of(f_off_mhz)
+    g = math.gcd(fcw, 1 << W_P_ACC)
+    return {"fcw": fcw, "gcd": g, "period": (1 << W_P_ACC) // g,
+            "f_exact_hz": fcw * FS_IN / (1 << W_P_ACC)}
+
+
+def export_witness_manifest(path: str | None = None, levels: dict | None = None) -> dict:
+    """witness 场景 manifest。levels 可选：{name: 实测功率/缩放}，由 scenarios 生成后填入。"""
+    scen = build_witness_scenarios()
+    m = {
+        "scenario_version": SCENARIO_VERSION,
+        "chain_version": CHAIN_VERSION,
+        "params": asdict(ChainParams()),
+        "n_sym": N_SYM,
+        "n_warmup_sym": N_WARMUP_SYM,
+        "seed_base": SEED_BASE,
+        "seed_rule": "sha256(scenario_key)[:8] >> 1",
+        "snr_definition": ("output measurement-domain P_des_out/P_noise_out = snr_db, "
+                           "via ideal integer-FCW mix + prototype FIR + R, same segment as q; "
+                           "before blocker; input full-band SNR reported per scenario"),
+        "qpsk_symbol_power": 0.5,
+        "front_end_scale_rule": "s = 0.95/peak if peak(|d+b+n|) >= 1 else 1; applied to all components",
+        "decim_phase": DECIM_PHASE,
+        "nco_init_phase": NCO_INIT_PHASE,
+        "fcw": {f"{f:.3f}": fcw_info(f) for f in W_F_MAIN_MHZ + W_F_HELDOUT_MHZ},
+        "scenarios": [dict(asdict(s), key=scenario_key(s.klass, s.f_off_mhz,
+                                                         s.blocker_off_mhz,
+                                                         s.blocker_rel_db, s.snr_db),
+                           **({"levels": levels[s.name + "@" + s.split]}
+                              if levels and (s.name + "@" + s.split) in levels else {}))
+                      for s in scen],
+    }
+    if path:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(m, fh, ensure_ascii=False, indent=2)
+    return m
 
 
 def export_manifest(path: str | None = None) -> dict:

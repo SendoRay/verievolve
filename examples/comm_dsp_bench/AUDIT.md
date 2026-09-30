@@ -101,3 +101,217 @@ scrambler 与 fft_64 两族（见 §5），fir_decim 列为 future work。**
 **新增回归**：`regression_cmul_moments.py`（R1 φ/量化器一致性、R2 残差分布
 频数对拍、R3 小位宽 nbits∈{4,5,6} 全枚举 vs helper 逐点一致、R4 结构等价、
 R5 锚点 0.375、R6 16 位蒙特卡罗抽查）。报告：`experiments_system/s0_model_fix/`。
+
+## 7. 2026-09-29 DDC witness 场景集 `ddc-witness-scen-v1`（WITNESS_FROZEN_DDC_v1 §4.1、§7-7/8/9/11/12）
+
+**新增**（`chains/ddc/spec.py`、`chains/ddc/scenarios.py`；旧 `build_scenarios`/`CHAIN_VERSION=ddc-p0-v2` 逐位不变）：
+- `build_witness_scenarios()`：C_main 36、C_heldout 32、C_stress 9；`Scenario.split` 标注；
+  seed = sha256(`SCENARIO_VERSION|SEED_BASE|klass|f|b|r|snr`)[:8]>>1，与列表位置无关。
+- §7-7 QPSK：波形幅度不变（不移动 ADC 工作点），声明改为每符号功率 0.5；desired 输入功率实测 ≈0.0625。
+- §7-8 AWGN：相对 desired-only、blocker 之前；与 Codex 澄清（msg_da31862c）后，30 dB 在**输出测量域**成立
+  （理想整数-FCW 混频 + 原型 FIR + R=2，测量段起点 240），对应输入全带 SNR ≈24.2–24.5 dB，逐场景入 manifest。
+- §7-9：暴露 `desired/blocker/noise` 与共同前端缩放 `scale`，`x = s·(d+b+n)`；77 场景实测均未触发缩放（peak ≤0.903）。
+- §7-11 部分：`export_witness_manifest()` 写入整数 FCW、gcd、周期、抽取相位 0、NCO 初相 0、场景键与 levels。
+
+**验证**：`tests/test_ddc_scenarios.py` 9 项通过；旧 15 场景 `x_adc` 与修改前 HEAD 逐位一致（sha256 对拍）。
+
+## 8. 2026-09-29 DDC 指标与排序评价器修复（未运行 truth）
+
+**修复**（`chains/ddc/metrics.py`、`run_s1.py`、`ref_chain.py`）：
+
+- `spectral_prediction` 的抽取折叠改为正确 preimage `k+j·N_out`；主预测改为与冻结 `q` 同口径的
+  输出全带功率，通带积分另存辅助字段，不再混为同一量。
+- `sfdr_db` 改为复 NCO 的冻结有限记录定义：按已知整数 FCW 载波做复数 LS 消除，再加四项
+  Blackman–Harris 窗和 8× 零填充 FFT；不再靠“峰值 ±2 bin”排除泄漏。理想单音和
+  −40/−60/−80 dBc 整数/半 bin 已知杂散校准进入单测。
+- 主实现误差在前导段相对同输入完整 float reference 估计单一复标量，测量段冻结；分母改为
+  desired-only 参考输出功率，同时保留线性 `q` 与 dB 表示。零实现误差例在数值实现中严格给出 `g=1,q=0`。
+- NCO 轨迹 SQNR 改用 `cos+j·sin` 复序列，不再把两列实数组误交给复数字段拆分函数。
+- 排序同时报告 tau-a 与 tie-corrected tau-b；top-k 在边界保留全部并列，并分别报告“任一最优命中”与
+  “全并列最优保留”；`worst_drop` 的 kept/dropped 标签和 gap 方向已修正。
+- 排序、跨场景稳定性和图中的主 truth 统一使用 aligned implementation error；raw 误差仍作为敏感性字段。
+- float reference NCO 改用与候选相同的 32-bit 整数 FCW，避免公共 FCW 量化进入候选误差或 `q_cal`。
+- 新运行目录为 `experiments_system/s1_local_vs_system_witness_v1`，使用 `C_main` 36 场景并写
+  witness manifest；不会覆盖旧 `s1_local_vs_system` 历史产物。
+
+**验证**：`tests/test_ddc_metrics.py` 7 项与 `tests/test_ddc_scenarios.py` 9 项联合通过（16 passed）；
+旧清单的 `chains/ddc/smoke_test.py` 通过。这里只运行单元/冒烟回归，**没有运行 S1 或任何 truth**。
+
+**本次修复完成时仍未过的正式运行 gate**：完整 32-bit accumulator-domain 的公平 `M_core`（含 `phase_bits`）与冻结的
+v2 二十点池尚未实现；在这两项完成、逐位验证并登记前，不得把 `run_s1.py` 产物当正式 witness。
+
+### 8.1 v2 二十点池登记
+
+冻结池已按 `WITNESS_FROZEN_DDC_v1` 落到 `candidates.NCO_WITNESS_V2_CANDIDATES`：4 个 nearest LUT、
+10 个 linear LUT、6 个 7–12 级 CORDIC，共 20 点；`witness_nco_candidates()` 默认返回历史六点与 v2 的
+26 个实现并集。`tpl_cordic` 与可进化模板的合法范围由 `8..20` 放宽为 `7..20`；历史 checkpoint / result
+文件不改。新增测试锁定 20/26 数量、三类计数及 stage 7 合法、stage 6 非法。
+
+### 8.2 完整 accumulator-domain `M_core`
+
+`metrics.nco_accumulator_metrics()` 已实现冻结的三个公平局部指标：calibrated complex SQNR、I/Q WCE
+（16-bit 输出 LSB）与 last-bit accuracy。候选只读取高 `phase_bits` 位，因此算法按相位 bin 精确合并
+2^32 状态：复增益/MSE 用单位根几何和，WCE 用不跨象限 bin 的端点，last-bit 命中数在整数 accumulator
+上对单调量化码区间做二分计数；复杂度不随 2^32 线性增长。nearest LUT、linear LUT、CORDIC_7 三类已在
+`acc_bits∈{10,11,12}` 的缩位宽域与全状态 brute force 对拍：复增益、MSE、WCE 与 hit count 全部一致。
+`build_witness_nco_pool()` 将其接到
+冻结 26 点池，并保留 `run_s1` 所需兼容字段。
+
+**更新后的正式运行 gate**：v2 池与 `M_core` 实现已落地；仍缺 20 点模型/RTL 等价验证，以及按冻结
+`ε_m` 做的全尺寸校准。完成前不得运行正式 witness truth。
+
+**runner 边界复核**：`run_s1.py` 当前仍通过 `build_all()` 取历史 6 个 NCO，并同时展开 8 个 FIR 与
+2 个 CMUL；这不等于冻结协议要求的“26 个 NCO、固定下游实现”。因此该脚本虽然已经修正场景与指标，
+仍只是旧 S1 的诊断 runner，不能直接产生正式 witness。RTL 等价 gate 通过后，须先把正式 runner 的
+候选集合锁为 26 个 NCO，并在 manifest 中写死固定下游配置，再允许运行 truth。
+
+### 8.3 `M_core` 独立复核与 raw 敏感性口径
+
+Claude 对 `nco_accumulator_metrics()` 做了只读公式审查，并另用 6 组配置全状态暴力枚举：复增益误差
+≤1.1e-14、WCE 误差 ≤5e-11 LSB、last-bit hit count 全部逐项相等；约 96 dB 的一项因闭式功率差
+发生浮点抵消，SQNR 误差约 5e-6 dB，远低于冻结的 0.10 dB 容差，但全尺寸校准仍是 truth 前 gate。
+几何和符号、calibrated MSE、端点 WCE 与单调区间计数均无 blocker。
+
+按冻结协议补充 raw SQNR/WCE/last-bit 三指标；raw 与 calibrated 均使用 ties-to-even 的理想 Q1.15 码并
+饱和到 `[-32768,32767]`，因此 `cos(0)=1` 对应理想码 32767。缩位宽对拍扩到 nearest、linear、
+CORDIC_7、`phase_bits<16` 与 `bin_size=1`，并新增 2^16 点测试锁定主链和 `M_core` 的
+accumulator 高位到 signed-angle 映射。raw 只作敏感性分析，不与 calibrated `q` 构造主 reversal。
+
+### 8.4 v2 NCO 模型—RTL 全映射等价
+
+`rtl_gen.gen_nco_verilog()` 与完整 DDC 生成器共用 LUT/CORDIC 映射代码；
+`tests/test_ddc_nco_rtl_equiv.py` 对冻结 v2 二十点逐个编译 RTL，并穷举候选实际读取的全部
+`2^phase_bits` 个高位相位字。联合报告还覆盖历史六点，因此主候选集 26/26 均为
+`mismatch=0`。逐候选状态数、映射 SHA-256 与分组见
+`experiments_system/nco_rtl_equiv_v1/report.json::{results,classes}`。
+
+完整映射得到 4 个非单例数值等价类：
+
+- `n2_lut256near_b16 = v2_lut256near_b16`；
+- `n3_lut1024lin_b12 = v2_lut1024lin_b12`；
+- `n4_lut1024lin_b16 = v2_lut1024lin_b16`；
+- `v2_lut1024lin_b8 = v2_lut256lin_b8`。
+
+这些候选只在 §2.3 主 pair 选择时按完整映射合并；面积/Pareto 仍保留全部实现。场景、指标与 RTL
+联合回归为 42 passed，旧链 smoke PASS。模型—RTL gate 已通过，但正式 truth 仍不能启动：须先补正式
+26-NCO/固定下游 runner，并完成 `q_cal` 与 runner manifest 审查。
+
+### 8.5 正式 witness 预检 manifest（未运行 truth）
+
+新增 `chains/ddc/prepare_witness_v1.py`，生成
+`experiments_system/ddc_witness_v1/preflight_manifest.json`。该 manifest 锁定：
+
+- 主候选集为历史 6 点 + v2 20 点，共 26 个 NCO；
+- 下游固定为 `f1_c16 + c1_exact_rne`，用于隔离 NCO 机制；同时保存 FIR 整数系数及 SHA-256；
+- 场景为 `ddc-witness-scen-v1`，聚合为 `C_main` 栅格 worst；
+- exact-representable 零误差校准得到 `q_cal=0`，故
+  `epsilon_Q=0.1*q_budget=2.32929922807541e-6`；
+- 引用并哈希 §8.4 的 26/26 RTL 等价报告。
+
+预检 manifest 明写 `truth_runner.allowed=false`，并把历史 `run_s1.py` 标为禁止的正式入口。新增 3 项预检
+测试后，场景/指标/RTL/预检联合回归为 45 passed。这里仍**没有运行任何 chain truth**；下一步须实现
+专用 26-NCO/固定下游 runner，并在执行前逐字段校验该 manifest。
+
+### 8.6 专用 runner、面积口径与双阶段 truth gate（仍未运行 truth）
+
+独立只读审查确认 §8.5 无 blocker 后，新增 `chains/ddc/run_witness_v1.py`，并把正式流程拆成不可跳过的
+两阶段：
+
+1. `prepare` 先计算并冻结 26 点 `M_core/M_DDS`、完整 Q-blind pair 审计与 NCO-only Nangate45 面积，
+   生成带三份产物哈希的 `execution_manifest.json`；该阶段不读取或计算任何链级 `Q`；
+2. `truth --run-id <new-id>` 只接受上述 execution manifest，拒绝旧 `run_s1.py`，按
+   `main → heldout → stress` 顺序运行。`main_decision.json` 必须先落盘，之后才读取 heldout/stress。
+
+预检 manifest 新增并冻结：Yosys 版本、Nangate45 `typ.lib` SHA-256、综合脚本文本及哈希、主 top
+`nco_map`、主成本口径 NCO-only、无 SDC/不得作 timing/power 主张；完整 DDC 面积仅作 context。另写入
+协议与 10 个实现文件的 SHA-256、Python/NumPy/SciPy 环境、`P_c=[0,240)` / `M_c=[240,end)`、以及
+SFDR 的 `N=2^16`、8× 零填充和四项 Blackman–Harris 定义。
+
+runner 逐候选×场景记录线性 `q_raw/q_aligned`、复增益、参考功率、CMUL/FIR 饱和数、混频预削波峰值、
+样本数及场景缩放；`Q` 只在线性域取 max 并保存 argmax。main/heldout 任一饱和即停止；stress 允许但必须
+报告。局部前沿、strict reversal/collapse、decision witness 与 SQNR 辅助 regret 均由冻结 local/area
+输入和 main `Q` 机械计算，六点、v2 二十点和 26 点并集分开报告。
+
+补充 3 个非零校准单测：已知复增益、已知小误差功率、desired-only 分母；`aligned_impl_error` 同时导出
+`gain_re/gain_im`。NCO-only 综合入口用一个临时候选做 smoke，成功解析 mapped area；该数只用于验证
+runner，不作为实验结论或候选比较。相关场景/指标/RTL/preflight/runner 测试共 **52 passed**。
+
+当前 `preflight_manifest.json::truth_runner.allowed` 仍为 `false`。下一道 gate 是显式运行 `prepare` 并审阅
+其 local/area/pair 三份冻结输入；本节没有生成 `frozen_inputs_v1`，也没有运行任何 chain truth。
+
+### 8.7 `frozen_inputs_v1` 已签发（仍未运行 chain truth）
+
+执行 `run_witness_v1.py prepare` 后生成以下不可覆盖产物：
+
+- `experiments_system/ddc_witness_v1/frozen_inputs_v1/local_metrics.json`：26 点完整 `M_core` 与
+  9+8 个整数 FCW 的有限记录 SFDR；
+- 同目录 `area_results.json`：26 点 NCO-only Nangate45 mapped area；
+- 同目录 `pair_selection.json`：20 点 v2 池全部 190 对的 Q-blind 审计；
+- 同目录 `execution_manifest.json`：上述三份产物与 preflight 的 SHA-256，且仅该 manifest
+  `truth_runner.allowed=true`。
+
+局部结果来自 `local_metrics.json::rows`：冻结规则选中
+`v2_lut512near_b16`（calibrated SQNR `44.58824775500641 dB`）与
+`v2_cordic8_b16`（`46.976135312974534 dB`），两端差 `2.387887557968128 dB`，满足 3 dB 门限。
+nearest512 的 truth 前纸面估计 `49.0 dB` 因此在 selection stage 被证伪；候选对恰好仍由冻结规则选中，
+未重选。两者 9-FCW worst SFDR 分别为 `47.81666971005927 dBc` 与 `47.84500439065506 dBc`，差小于
+冻结 `0.25 dB` 容差；这只是局部 collapse 候选，尚无链级 `Q`，不能称 reversal。
+
+面积来自 `area_results.json::rows[*].area_um2`，26 点范围为 `368.41–3809.918 μm²`；主 pair 两端分别为
+`820.61` 与 `1584.03 μm²`。这些是综合口径，不是物理实现，也不含固定下游 context。pair 审计 190 对中
+11 对 eligible、113 对因 `|ΔSQNR|>3 dB` 剔除、66 对为同 architecture class；没有放宽门限。
+
+`execution_manifest.json` 的四个引用哈希已由 runner 复验，26 点 local/area 均完整且局部 SQNR/SFDR
+全部有限。`runs/` 尚不存在，因此截至本节仍没有 main/heldout/stress chain truth。下一步正式入口唯一为
+`run_witness_v1.py truth --run-id <new-id>`；ε_Q 只能从 manifest 读取。
+
+### 8.8 formal truth `formal-v1-20260930`
+
+唯一正式入口完成 26 候选 × 77 场景，共 2002 行：main 936、heldout 832、stress 234。产物位于
+`experiments_system/ddc_witness_v1/runs/formal-v1-20260930/`；`main_checkpoint.json` 与
+`main_decision.json` 在 heldout/stress 之前落盘。全体 `n_sat_mix=n_sat_fir=0`，最大
+`mix_preclip_peak_ratio=0.8078684061765671`，没有触发协议停止条件。
+
+主契约结论来自 `main_decision.json::metrics.*.pools`：
+
+- legacy 6 点池四项均无 strict reversal/collapse，P0 的 E0 先验成立；
+- v2 二十点池：SQNR/WCE/SFDR 各 1 个 strict reversal；last-bit 有 8 个 strict reversal、3 个 collapse；
+- 26 点并集：SQNR/WCE/SFDR 各 3 个 strict reversal；last-bit 有 10 个 strict reversal、7 个 collapse；
+- 四项指标的 `decision_witness=false`，即没有任何局部指标–面积前沿点在 `(Q,area)` 上被严格支配。
+
+SQNR/WCE/SFDR 的共同 strict witness 是局部更好的 `v2_cordic7_b16` 被 nearest-256 三个标签中的实现反转。
+例如相对 `n1_lut256near_b12`，`ΔSQNR=2.120721093670923 dB`，但
+`Q_cordic7-Q_n1=4.968561768671522e-6 > ε_Q`。不过两者主 `Q` 分别为
+`1.143729761463575e-4` 与 `1.0940441437768597e-4`，均约为 `q_budget` 的 4.7–4.9 倍；并且 CORDIC7
+不在可造成设计损失的局部–面积选择位置。因此该结果只支持 **mechanism witness**，不支持“局部指标造成
+设计损失”。
+
+预注册主 pair 为 `v2_lut512near_b16` vs `v2_cordic8_b16`；两者 main `Q` 分别为
+`3.27362955299273e-5` 与 `3.418376897719962e-5`，`|ΔQ|=1.447473447272321e-6 < ε_Q`，故 P1 的固定 pair
+方向预测为阴性，按协议不重选。SQNR≥S* 的辅助选择为 `v2_lut1024lin_b10`，其 quality/area regret 均为 0。
+
+main `Q` 范围为 `6.3482103150183136e-9–5.312937877302314e-4`；heldout 与 stress 单独保留，未混入主判定。
+当前 Evaluation axis 不是 E0（已存在超阈保序失败），但 E1/E2/E3 尚未确定：下一步必须先冻结基线③
+相对 truth 的 Gate A/B 阈值，再运行 candidate-exact linear-reference baseline。不得用本轮已见结果调整阈值。
+
+### 8.9 candidate-exact linear-reference baseline ③：E1
+
+运行前新建并冻结 `thesis/BASELINE3_PROTOCOL_DDC_v1.md`。Gate A 的工程绝对阈值直接复用 truth 前已有的
+`epsilon_Q=2.32929922807541e-6`；Gate B 冻结 `k={1,3,5}`，要求最大 top-k regret、最大预算违约均不超过
+`epsilon_Q`，且 formal truth 登记的每个 failure 均被③同向排序或判为 ε 内并列。stress 不参与 gate。
+
+`chains/ddc/run_linear_baseline_v1.py` 在 NCO 接口取候选 bit-true 复本振，用同一 `x_adc`、固定
+`f1_c16` 的 `hq/2^(wc-2)` 线性 FIR 和 phase-0 抽取做相干传播；排除 CMUL/FIR 数据通路 round/sat。
+结果保存于 `experiments_system/ddc_witness_v1/baseline3_v1/results.json`，共 2002 行。
+
+Gate A（`results.json::gate_a`）通过：main+heldout 1768 点的绝对误差 median/p95/max 分别为
+`3.240737126439407e-9`、`1.6379201467809804e-8`、`8.962187760598898e-8`；最大值仅为 ε_Q 的
+`0.03847589718219213`。nearest LUT、linear LUT、CORDIC 三类各自 max 均低于阈值。
+
+Gate B（`results.json::gate_b`）通过：top-1/3/5 regret 全为 0，true-best 均命中；false-feasible 为 0，
+最大预算违约为 0；Kendall τ-b=`1.0`；formal truth 登记的 26 个 metric×pair failure 全部 explained。
+
+因此 Evaluation axis 正式归为 **E1**：本轮保序失败由 candidate-dependent coherent linear propagation
+完整解释，属于经典线性物理。不得声称新误差理论，也没有证据要求用④解释本批数据。③在工程容差内可称
+validated approximation / ranking surrogate，不称 full-chain 精确恒等。当前仍无 decision witness；下一步若做
+搜索，贡献只能检验“自动装配结构特异链级 fitness + 开放结构搜索”是否得到 S1，不能把本轮机制反转写成设计损失。

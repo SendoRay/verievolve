@@ -116,10 +116,9 @@ def _lut_wave(tag: str, depth: int, order: str, zsrc: str) -> list:
     return lines
 
 
-def _gen_nco_lut(nco_cfg: dict, fcw: int) -> list:
-    b = int(nco_cfg["phase_bits"])
-    depth, order = int(nco_cfg["depth"]), nco_cfg["order"]
-    lines = [
+def _nco_acc_lines(fcw: int) -> list:
+    """32 位相位累加器（复位后首个有效拍相位为 0）。"""
+    return [
         "    // ---- NCO：32 位相位累加器 + 相位截断 ----",
         "    reg [31:0] phase_acc;",
         f"    localparam [31:0] PHASE_FCW = 32'h{fcw & 0xFFFFFFFF:08x};",
@@ -128,6 +127,18 @@ def _gen_nco_lut(nco_cfg: dict, fcw: int) -> list:
         "        if (!rst_n) phase_acc <= PHASE_INIT;",
         "        else phase_acc <= phase_acc + PHASE_FCW;",
         "    end",
+    ]
+
+
+def _gen_nco_lut(nco_cfg: dict, fcw: int) -> list:
+    return _nco_acc_lines(fcw) + _nco_map_lut(nco_cfg)
+
+
+def _nco_map_lut(nco_cfg: dict) -> list:
+    """phase_acc → nco_sin/nco_cos 的组合映射（LUT）。"""
+    b = int(nco_cfg["phase_bits"])
+    depth, order = int(nco_cfg["depth"]), nco_cfg["order"]
+    lines = [
         f"    wire [{b-1}:0] phase_w = phase_acc[31:{32-b}];",
         f"    wire [15:0] z_sin = {{phase_w, {{{16-b}{{1'b0}}}}}};",
         "    wire [15:0] z_cos = z_sin + 16'd16384;",
@@ -143,18 +154,15 @@ def _gen_nco_lut(nco_cfg: dict, fcw: int) -> list:
 
 
 def _gen_nco_cordic(nco_cfg: dict, fcw: int) -> list:
+    return _nco_acc_lines(fcw) + _nco_map_cordic(nco_cfg)
+
+
+def _nco_map_cordic(nco_cfg: dict) -> list:
+    """phase_acc → nco_sin/nco_cos 的组合映射（展开 CORDIC）。"""
     b = int(nco_cfg["phase_bits"])
     stages = int(nco_cfg["stages"])
     alpha = [round(math.atan(2.0 ** -i) * 65536 / math.pi) for i in range(stages)]
     lines = [
-        "    // ---- NCO：32 位相位累加器 + 相位截断 ----",
-        "    reg [31:0] phase_acc;",
-        f"    localparam [31:0] PHASE_FCW = 32'h{fcw & 0xFFFFFFFF:08x};",
-        f"    localparam [31:0] PHASE_INIT = 32'h{(0x100000000 - fcw) & 0xFFFFFFFF:08x};  // -FCW：首个递增后为 0",
-        "    always @(posedge clk) begin",
-        "        if (!rst_n) phase_acc <= PHASE_INIT;",
-        "        else phase_acc <= phase_acc + PHASE_FCW;",
-        "    end",
         f"    wire [{b-1}:0] phase_w = phase_acc[31:{32-b}];",
         f"    wire [15:0] z16 = {{phase_w, {{{16-b}{{1'b0}}}}}};",
         "    // ---- 展开 CORDIC（za0 = 8·z mod 2^18；x/y 19 位自然回绕）----",
@@ -188,6 +196,26 @@ def _gen_nco_cordic(nco_cfg: dict, fcw: int) -> list:
         " ((cos_n < -32768) ? -16'sd32768 : cos_n[15:0]);",
     ]
     return lines
+
+
+def gen_nco_verilog(nco_cfg: dict) -> str:
+    """NCO 组合映射单独成模块（module nco_map），供全映射逐位对拍。
+
+    与 gen_ddc_verilog 共用同一映射代码；输入为 32 位 accumulator 状态。
+    """
+    body = "\n".join(_nco_map_lut(nco_cfg) if nco_cfg["algo"] == "lut"
+                     else _nco_map_cordic(nco_cfg))
+    return f"""// NCO 映射 nco={nco_cfg['name']}
+module nco_map (
+    input  wire [31:0] phase_acc,
+    output wire signed [15:0] sin_o,
+    output wire signed [15:0] cos_o
+);
+{body}
+    assign sin_o = nco_sin;
+    assign cos_o = nco_cos;
+endmodule
+"""
 
 
 # ---------------------------------------------------------------------------
