@@ -569,3 +569,14 @@ NCO（数控振荡器，也就是正弦发生器）有好几种硬件做法：�
 - WP2 NCO leaf smoke 已落地：`lower_bittrue.py` 与 `lower_rtl.py` 只按 IR node kind 把 LUT/CORDIC 叶子映射到现有 bit-true 模型和 `nco_map` RTL，不读取候选名；结构名由语义 hash 生成。随机 accumulator 对拍和既有 26 点 RTL 等价回归合计 62 passed。`phasor_compose` 当前显式拒绝 lowering，等其 coarse/residual 位语义冻结后再做 WP3，避免无声回退成叶子模板。
 - `phasor_compose` 的候选位语义已写入搜索协议：32 位相位按最近 coarse 格点分解，残差唯一落在 `[-S/2,S/2)`，coarse/residual 子节点各自输出 Q1.15 phasor，再做显式复乘、右移舍入和 Q1.15 饱和。精确性只属于相位分解恒等式，子原语与组合乘法仍计实现误差。
 - WP3 首个未注册组合结构已闭环：通用 `phasor_compose` lowering 生成 coarse-LUT + residual-CORDIC 的整数模型和层次化 RTL，不按候选名写专用分支。相位 split 的 modulo 恒等式与 centered residual、组合乘法均有测试；`rne`/`trunc` 两种模式在随机 accumulator 和 coarse 边界点上经 Icarus 逐位一致，生成 RTL 通过 Yosys `synth -top nco_map; check`。搜索 IR + DDC 相关回归现为 65 passed，单独 schema/lowering 含综合为 14 passed。
+- WP4 的两个 FIR/R=2 结构已独立落地：direct-symmetric 在对称预加乘积后量化，polyphase 在逐 tap 乘积后分别做偶/奇支路求和；无 product drop 时两者逐位等价，有 drop 时能产生结构特异误差。两种流式 RTL 在 `rne/trunc`、product drop、有限 accumulator 配置上均与各自 Python 模型对拍，Yosys `hierarchy/proc/opt/check` 通过；相关 DDC/IR 回归 81 passed。
+- 通用 FIR 完整 `synth` 单测在 110 秒内未完成并被人工中止，不登记为失败，也不冒充正式面积证据。R4 的“可综合 + 面积”仍须用冻结 Nangate45 脚本、结构 hash 缓存和明确超时正式执行；当前只证明前端可展开、结构检查通过且仿真位一致。
+- WP5 已完成最小整链闭环：`emulate_ddc_candidate` 与 `lower_ddc_rtl` 共用 typed IR 和 32 位可编程 FCW，覆盖 NCO→固定 exact/rne CMUL→FIR/R=2。叶子 LUT+direct FIR 与未注册 LUT/CORDIC compose+polyphase FIR 两个完整候选在 97 拍随机输入上经 Icarus 逐位一致，并通过 Yosys 结构检查；IR/DDC 相关回归 85 passed。
+- 这一步仍不产生研究数字：没有跑冻结 77 场景、没有综合 Nangate45 面积、没有接搜索器或 LLM。下一 gate 是把 candidate manifest 接进冻结契约 evaluator、冻结全链综合缓存键，再做 R4 正式面积与非 LLM pilot。
+
+## 2026-09-30 S1 接口背压闭环
+
+- 自检发现前一版生成 RTL 只有 `in_valid`，没有完整的 ready/valid 语义；这不满足 P2，因此在进入搜索前补齐一深度输出弹性缓冲。FIR 与完整 DDC top 现在都有 `in_valid/in_ready/out_valid/out_ready`，输入状态、相位累加器和 FIR 延迟线只在 `in_valid && in_ready` 时推进。
+- 新增真实停顿测试：在第一个有效 DDC 输出保持 `out_ready=0` 三拍，验证 `in_ready=0`、输出数据稳定且下一输入未被提前接受；恢复后继续输入，输出序列与 bit-true Python 模型逐点一致。direct-symmetric 与 polyphase 两个候选均通过（2 passed）。
+- valid/ready 修复后的 FIR/DDC 回归为 21 passed；仍未跑冻结 truth、Nangate45 面积或任何搜索实验。下一步仍是 candidate manifest/evaluator 接口与冻结综合缓存键，之后才做 R4 正式面积和非 LLM pilot。
+- 随后完整相关回归（search_ir schema/lowering/FIR/DDC、DDC metrics/scenarios、witness preflight、NCO RTL equivalence）共 87 passed，未启动冻结 truth、Nangate45 面积或搜索实验。

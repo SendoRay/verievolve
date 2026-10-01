@@ -11,7 +11,7 @@ from certfit import tpl_cordic
 from chains.ddc import fixed_chain, ref_chain
 
 from .canonicalize import candidate_hash
-from .validate import validate_fir_node, validate_nco_node
+from .validate import validate_candidate, validate_fir_node, validate_nco_node
 
 
 def leaf_nco_config(node: Mapping[str, Any]) -> dict[str, Any]:
@@ -210,4 +210,47 @@ def emulate_fir_decimator(
         "n_sat": sat_re + sat_im,
         "output_indices": output_indices,
         "hq": hq,
+    }
+
+
+def emulate_ddc_candidate(
+    candidate: Mapping[str, Any], i12: np.ndarray, q12: np.ndarray, fcw: int
+) -> dict[str, Any]:
+    """Evaluate a complete IR candidate on contiguous signed Q1.11 samples."""
+    validate_candidate(candidate)
+    input_re = np.asarray(i12, dtype=np.int64)
+    input_im = np.asarray(q12, dtype=np.int64)
+    if input_re.ndim != 1 or input_im.ndim != 1 or len(input_re) != len(input_im):
+        raise ValueError("i12 and q12 must be one-dimensional arrays of equal length")
+    adc_low, adc_high = -(1 << 11), (1 << 11) - 1
+    if np.any(input_re < adc_low) or np.any(input_re > adc_high):
+        raise ValueError("i12 contains values outside signed Q1.11")
+    if np.any(input_im < adc_low) or np.any(input_im > adc_high):
+        raise ValueError("q12 contains values outside signed Q1.11")
+    if not isinstance(fcw, int) or not 0 <= fcw <= 0xFFFFFFFF:
+        raise ValueError("fcw must be an unsigned 32-bit integer")
+
+    sample_index = np.arange(len(input_re), dtype=np.int64)
+    phase_acc = (sample_index * fcw) & 0xFFFFFFFF
+    sin_code, cos_code = emulate_nco_accumulators(candidate["nco"], phase_acc)
+    mixer = fixed_chain.mixer_fixed(
+        input_re,
+        input_im,
+        sin_code,
+        cos_code,
+        {"name": "ir-fixed-mixer", "prod_drop": 0, "mode": "rne"},
+    )
+    fir = emulate_fir_decimator(
+        candidate["filter_decimator"], mixer["re"], mixer["im"]
+    )
+    return {
+        "y_re": fir["re"],
+        "y_im": fir["im"],
+        "output_indices": fir["output_indices"],
+        "sin": sin_code,
+        "cos": cos_code,
+        "mix_re": mixer["re"],
+        "mix_im": mixer["im"],
+        "n_sat_mix": mixer["n_sat"],
+        "n_sat_fir": fir["n_sat"],
     }

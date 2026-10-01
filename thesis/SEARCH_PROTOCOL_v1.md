@@ -6,6 +6,9 @@
 - 评价契约：[`CONTRACT_DDC_v1.md`](CONTRACT_DDC_v1.md)
 - 已知评价结论：DDC witness 为 E1；见
   `examples/comm_dsp_bench/experiments_system/ddc_witness_v1/baseline3_v1/results.json`
+- 实现进度：WP1–WP3 已通过；WP4 的 bit-true / 流式 RTL 对拍与 Yosys 结构检查已通过；WP5
+  已形成可编程 FCW 的完整 DDC 模型—RTL最小闭环。冻结场景评价、Nangate45 面积综合与 R4 正式
+  签字尚未进行。
 
 ## 1. 本阶段到底要回答什么
 

@@ -9,7 +9,7 @@ from chains.ddc import rtl_gen
 
 from .canonicalize import candidate_hash
 from .lower_bittrue import fir_node_config, leaf_nco_config, resolve_fir_coefficients
-from .validate import validate_fir_node, validate_nco_node
+from .validate import validate_candidate, validate_fir_node, validate_nco_node
 
 
 def _rename_leaf_module(source: str, module_name: str) -> str:
@@ -217,7 +217,7 @@ def _direct_fir_body(hq: Any, config: Mapping[str, Any]) -> tuple[list[str], str
             "                line_re[line_index] <= 16'sd0;",
             "                line_im[line_index] <= 16'sd0;",
             "            end",
-            "        end else if (in_valid) begin",
+            "        end else if (accept) begin",
             "            line_re[0] <= x_re;",
             "            line_im[0] <= x_im;",
             f"            for (line_index = 1; line_index < {taps - 1}; "
@@ -321,7 +321,7 @@ def _polyphase_fir_body(hq: Any, config: Mapping[str, Any]) -> tuple[list[str], 
             "            end",
             f"            {odd_registers[0][0]} <= {accumulator_width}'sd0;",
             f"            {odd_registers[1][0]} <= {accumulator_width}'sd0;",
-            "        end else if (in_valid) begin",
+            "        end else if (accept) begin",
             "            if (sample_count[0] == 1'b0) begin",
             "                even_re[0] <= x_re;",
             "                even_im[0] <= x_im;",
@@ -363,13 +363,17 @@ module fir_decimator (
     input  wire clk,
     input  wire rst_n,
     input  wire in_valid,
+    output wire in_ready,
     input  wire signed [15:0] x_re,
     input  wire signed [15:0] x_im,
     output reg  signed [15:0] y_re,
     output reg  signed [15:0] y_im,
-    output reg out_valid
+    output reg out_valid,
+    input  wire out_ready
 );
     reg [31:0] sample_count;
+    assign in_ready = ~out_valid | out_ready;
+    wire accept = in_valid & in_ready;
 {body_text}
     always @(posedge clk) begin
         if (!rst_n) begin
@@ -378,8 +382,9 @@ module fir_decimator (
             y_im <= 16'sd0;
             out_valid <= 1'b0;
         end else begin
-            out_valid <= 1'b0;
-            if (in_valid) begin
+            if (out_valid && out_ready)
+                out_valid <= 1'b0;
+            if (accept) begin
                 if ((sample_count >= 32) && (sample_count[0] == 1'b0)) begin
                     y_re <= {out_re};
                     y_im <= {out_im};
@@ -391,3 +396,60 @@ module fir_decimator (
     end
 endmodule
 """
+
+
+def lower_ddc_rtl(candidate: Mapping[str, Any]) -> str:
+    """Lower a complete IR candidate to a programmable-FCW streaming DDC."""
+    validate_candidate(candidate)
+    nco_source = lower_nco_map_rtl(candidate["nco"])
+    fir_source = lower_fir_decimator_rtl(candidate["filter_decimator"])
+    top = f"""// Complete DDC generated from search IR {candidate_hash(candidate)}
+module top (
+    input  wire clk,
+    input  wire rst_n,
+    input  wire in_valid,
+    output wire in_ready,
+    input  wire [31:0] fcw,
+    input  wire signed [11:0] i_in,
+    input  wire signed [11:0] q_in,
+    output wire signed [15:0] y_re,
+    output wire signed [15:0] y_im,
+    output wire out_valid,
+    input  wire out_ready
+);
+    reg [31:0] phase_acc;
+    always @(posedge clk) begin
+        if (!rst_n)
+            phase_acc <= 32'd0;
+        else if (in_valid && in_ready)
+            phase_acc <= phase_acc + fcw;
+    end
+
+    wire signed [15:0] nco_sin, nco_cos;
+    nco_map u_nco (
+        .phase_acc(phase_acc), .sin_o(nco_sin), .cos_o(nco_cos)
+    );
+
+    wire signed [27:0] prod_ic = $signed(i_in) * $signed(nco_cos);
+    wire signed [27:0] prod_qs = $signed(q_in) * $signed(nco_sin);
+    wire signed [27:0] prod_is = $signed(i_in) * $signed(nco_sin);
+    wire signed [27:0] prod_qc = $signed(q_in) * $signed(nco_cos);
+    wire signed [28:0] mix_re_pre =
+        {{prod_ic[27], prod_ic}} + {{prod_qs[27], prod_qs}};
+    wire signed [28:0] mix_im_pre =
+        {{prod_qc[27], prod_qc}} - {{prod_is[27], prod_is}};
+    wire signed [28:0] mix_re_shift = (mix_re_pre + 29'sd1024) >>> 11;
+    wire signed [28:0] mix_im_shift = (mix_im_pre + 29'sd1024) >>> 11;
+    wire signed [15:0] mix_re = (mix_re_shift > 32767) ? 16'sd32767 :
+        ((mix_re_shift < -32768) ? -16'sd32768 : mix_re_shift[15:0]);
+    wire signed [15:0] mix_im = (mix_im_shift > 32767) ? 16'sd32767 :
+        ((mix_im_shift < -32768) ? -16'sd32768 : mix_im_shift[15:0]);
+
+    fir_decimator u_fir (
+        .clk(clk), .rst_n(rst_n), .in_valid(in_valid), .in_ready(in_ready),
+        .x_re(mix_re), .x_im(mix_im),
+        .y_re(y_re), .y_im(y_im), .out_valid(out_valid), .out_ready(out_ready)
+    );
+endmodule
+"""
+    return top + "\n" + nco_source + "\n" + fir_source

@@ -135,13 +135,16 @@ reg clk = 1'b0;
 always #5 clk = ~clk;
 reg rst_n = 1'b0;
 reg in_valid = 1'b0;
+wire in_ready;
 reg signed [15:0] x_re = 16'sd0;
 reg signed [15:0] x_im = 16'sd0;
 wire signed [15:0] y_re, y_im;
 wire out_valid;
+reg out_ready = 1'b1;
 fir_decimator dut(
-    .clk(clk), .rst_n(rst_n), .in_valid(in_valid), .x_re(x_re), .x_im(x_im),
-    .y_re(y_re), .y_im(y_im), .out_valid(out_valid)
+    .clk(clk), .rst_n(rst_n), .in_valid(in_valid), .in_ready(in_ready),
+    .x_re(x_re), .x_im(x_im), .y_re(y_re), .y_im(y_im),
+    .out_valid(out_valid), .out_ready(out_ready)
 );
 initial begin
     repeat (2) @(posedge clk);
@@ -169,7 +172,7 @@ initial begin
 @pytest.mark.parametrize(
     "node", [direct_symmetric_fir(12), polyphase_decimator(12)]
 )
-def test_fir_streaming_rtl_is_synthesizable(tmp_path, node):
+def test_fir_streaming_rtl_passes_yosys_structural_check(tmp_path, node):
     if shutil.which("yosys") is None:
         pytest.skip("yosys not installed")
     rtl_path = tmp_path / "fir.v"
@@ -179,7 +182,8 @@ def test_fir_streaming_rtl_is_synthesizable(tmp_path, node):
             "yosys",
             "-q",
             "-p",
-            f"read_verilog -sv {rtl_path}; synth -top fir_decimator; check",
+            f"read_verilog -sv {rtl_path}; hierarchy -check -top fir_decimator; "
+            "proc; opt; check",
         ],
         capture_output=True,
         text=True,

@@ -7,6 +7,7 @@ representation gates in ``thesis/SEARCH_PROTOCOL_v1.md`` pass.
 
 from .canonicalize import candidate_hash, canonical_json
 from .lower_bittrue import (
+    emulate_ddc_candidate,
     emulate_fir_decimator,
     emulate_nco_accumulators,
     fir_node_config,
@@ -14,7 +15,7 @@ from .lower_bittrue import (
     resolve_fir_coefficients,
     split_phase_accumulators,
 )
-from .lower_rtl import lower_fir_decimator_rtl, lower_nco_map_rtl
+from .lower_rtl import lower_ddc_rtl, lower_fir_decimator_rtl, lower_nco_map_rtl
 from .schema import (
     CONTRACT_VERSION,
     FORMULA_VERSION,
@@ -43,12 +44,14 @@ __all__ = [
     "cordic_sincos",
     "ddc_candidate",
     "direct_symmetric_fir",
+    "emulate_ddc_candidate",
     "emulate_fir_decimator",
     "emulate_nco_accumulators",
     "fir_node_config",
     "leaf_nco_config",
     "lower_nco_map_rtl",
     "lower_fir_decimator_rtl",
+    "lower_ddc_rtl",
     "lut_sincos",
     "phasor_compose",
     "polyphase_decimator",
