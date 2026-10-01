@@ -46,7 +46,7 @@ def _integer(value: Any, path: str, low: int, high: int) -> int:
 
 
 def _choice(value: Any, path: str, choices: set[str]) -> str:
-    if value not in choices:
+    if not isinstance(value, str) or value not in choices:
         _fail(path, f"must be one of {sorted(choices)}")
     return str(value)
 
@@ -56,6 +56,10 @@ def _validate_fixed(value: Any, path: str, expected: tuple[int, int, bool]) -> N
     _exact_keys(obj, path, {"kind", "signed", "width", "frac"})
     if obj["kind"] != "fixed":
         _fail(f"{path}.kind", "must be fixed")
+    _integer(obj["width"], f"{path}.width", expected[0], expected[0])
+    _integer(obj["frac"], f"{path}.frac", expected[1], expected[1])
+    if not isinstance(obj["signed"], bool):
+        _fail(f"{path}.signed", "expected a boolean")
     got = (obj["width"], obj["frac"], obj["signed"])
     if got != expected:
         _fail(path, f"expected width/frac/signed={expected}, got {got}")
@@ -82,6 +86,8 @@ def _validate_stream(
     _validate_complex(obj["value"], f"{path}.value", expected_format)
     rate = _mapping(obj["rate"], f"{path}.rate")
     _exact_keys(rate, f"{path}.rate", {"num", "den"})
+    _integer(rate["num"], f"{path}.rate.num", expected_rate[0], expected_rate[0])
+    _integer(rate["den"], f"{path}.rate.den", expected_rate[1], expected_rate[1])
     if (rate["num"], rate["den"]) != expected_rate:
         _fail(f"{path}.rate", f"expected {expected_rate}")
 
@@ -95,6 +101,7 @@ def _validate_nco(value: Any, path: str, depth: int = 0) -> None:
         _exact_keys(obj, path, required)
         if obj["table"] != "quarter_wave":
             _fail(f"{path}.table", "v1 supports quarter_wave only")
+        _integer(obj["depth"], f"{path}.depth", 64, 1024)
         if obj["depth"] not in {64, 128, 256, 512, 1024}:
             _fail(f"{path}.depth", "must be one of 64,128,256,512,1024")
         _choice(obj["interpolation"], f"{path}.interpolation", {"nearest", "linear", "quad"})
@@ -150,17 +157,15 @@ def _validate_fir(value: Any, path: str) -> None:
         _exact_keys(obj, path, common)
     elif kind == "polyphase_fir_decimator":
         _exact_keys(obj, path, common | {"phases"})
-        if obj["phases"] != 2:
-            _fail(f"{path}.phases", "must equal the R=2 contract")
+        _integer(obj["phases"], f"{path}.phases", 2, 2)
     else:
         _fail(f"{path}.kind", f"unsupported FIR node {kind!r}")
-    if obj["decimation"] != 2:
-        _fail(f"{path}.decimation", "must equal the R=2 contract")
+    _integer(obj["decimation"], f"{path}.decimation", 2, 2)
     if obj["coefficients_id"] != "ddc-v1-h33":
         _fail(f"{path}.coefficients_id", "must use the frozen coefficient family")
     _integer(obj["coefficient_bits"], f"{path}.coefficient_bits", 8, 24)
     _integer(obj["product_drop"], f"{path}.product_drop", 0, 8)
-    accumulator_bits = obj["accumulator_bits"]
+    accumulator_bits = _integer(obj["accumulator_bits"], f"{path}.accumulator_bits", 0, 48)
     if accumulator_bits != 0:
         _integer(accumulator_bits, f"{path}.accumulator_bits", 20, 48)
     _choice(obj["rounding"], f"{path}.rounding", {"rne", "trunc"})
@@ -197,6 +202,7 @@ def validate_candidate(candidate: Mapping[str, Any]) -> None:
 
     phase = _mapping(obj["phase_accumulator"], "candidate.phase_accumulator")
     _exact_keys(phase, "candidate.phase_accumulator", {"kind", "width"})
+    _integer(phase["width"], "candidate.phase_accumulator.width", 32, 32)
     if phase != {"kind": "phase_accumulator", "width": 32}:
         _fail("candidate.phase_accumulator", "must be the frozen 32-bit accumulator")
 
@@ -208,6 +214,7 @@ def validate_candidate(candidate: Mapping[str, Any]) -> None:
         "candidate.mixer",
         {"kind", "product_drop", "rounding", "saturation", "output"},
     )
+    _integer(mixer["product_drop"], "candidate.mixer.product_drop", 0, 0)
     if (
         mixer["kind"],
         mixer["product_drop"],

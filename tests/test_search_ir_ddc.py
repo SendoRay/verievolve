@@ -11,6 +11,7 @@ BENCH = Path(__file__).resolve().parents[1] / "examples" / "comm_dsp_bench"
 sys.path.insert(0, str(BENCH))
 
 from search_ir import (
+    candidate_hash,
     cordic_sincos,
     ddc_candidate,
     direct_symmetric_fir,
@@ -20,6 +21,7 @@ from search_ir import (
     phasor_compose,
     polyphase_decimator,
 )
+from search_ir.dev_fixtures import development_candidates
 
 
 def _literal(width, value):
@@ -28,7 +30,7 @@ def _literal(width, value):
 
 
 def _candidates():
-    return [
+    existing = [
         ddc_candidate(
             lut_sincos(256, "linear", 12), direct_symmetric_fir(12)
         ),
@@ -41,6 +43,12 @@ def _candidates():
             polyphase_decimator(12, product_drop=2, accumulator_bits=24),
         ),
     ]
+    # 保留历史两配置，再加入三份公共 fixture；按结构身份避免重复执行。
+    by_hash = {
+        candidate_hash(candidate): candidate
+        for candidate in [*existing, *development_candidates()]
+    }
+    return list(by_hash.values())
 
 
 @pytest.mark.parametrize("candidate", _candidates())

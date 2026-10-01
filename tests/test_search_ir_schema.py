@@ -96,3 +96,42 @@ def test_validator_rejects_nested_composition_in_v1():
     candidate = ddc_candidate(nested, direct_symmetric_fir(coefficient_bits=12))
     with pytest.raises(IRValidationError, match="one phasor_compose level"):
         validate_candidate(candidate)
+
+
+@pytest.mark.parametrize("path,value", [
+    ("adc_input.value.component.width", 12.0),
+    ("adc_input.value.component.frac", 11.0),
+    ("adc_input.value.component.signed", 1),
+    ("adc_input.rate.num", True),
+    ("adc_input.rate.den", 1.0),
+    ("phase_accumulator.width", 32.0),
+    ("mixer.product_drop", False),
+    ("mixer.product_drop", 0.0),
+    ("filter_decimator.decimation", 2.0),
+    ("filter_decimator.phases", 2.0),
+    ("filter_decimator.accumulator_bits", False),
+    ("filter_decimator.accumulator_bits", 0.0),
+    ("filter_decimator.output.rate.den", 2.0),
+    ("nco.depth", 256.0),
+    ("nco.depth", []),
+    ("nco.depth", {}),
+    ("nco.interpolation", []),
+    ("nco.interpolation", {}),
+    ("filter_decimator.rounding", []),
+])
+def test_raw_json_rejects_type_aliases_and_containers(path, value):
+    # 直接改原始对象，不让 constructor 的强制转换修饰非法 JSON。
+    candidate = ddc_candidate(lut_sincos(256, "linear", 12), polyphase_decimator(16))
+    fields = path.split(".")
+    target = candidate
+    for field in fields[:-1]:
+        target = target[field]
+    target[fields[-1]] = value
+    with pytest.raises(IRValidationError, match=fields[-1]):
+        validate_candidate(candidate)
+
+
+def test_valid_candidate_identity_is_unchanged_by_strict_validation():
+    candidate = ddc_candidate(lut_sincos(256, "linear", 12), direct_symmetric_fir(16))
+    validate_candidate(candidate)
+    assert candidate_hash(candidate) == "9d32c95267b25f2633df23a18e7bbd18cc8ba30395f855990b51eda368254f3c"
