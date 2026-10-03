@@ -121,7 +121,7 @@ def test_area_identity_mismatch_is_rejected(fault, monkeypatch):
         original = vm._sha
 
         def changed(path):
-            return "0" * 64 if path.name == "synthesize.py" else original(path)
+            return "0" * 64 if path.name == "NangateOpenCellLibrary_typical.lib" else original(path)
 
         monkeypatch.setattr(vm, "_sha", changed)
     with pytest.raises(EvaluationError, match="身份不匹配|发生漂移"):

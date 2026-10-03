@@ -75,8 +75,9 @@ def _lut_interp(depth: int, order: str, tag: str) -> list:
             f"wire signed [7:0] a2_{tag} = a2f_{tag}[7:0];   // 模型复刻的 a2[7:0] 截断",
             f"wire signed [{2 * fb + 1}:0] qw_{tag} = {{1'b0, d_{tag}}} * ({{1'b0, d_{tag}}} - {1 << fb});",
             f"wire signed [{8 + 2 * fb + 1}:0] t2_{tag} = a2_{tag} * qw_{tag};",
-            f"wire signed [17:0] qr_{tag} = (t2_{tag} >>> {2 * fb + 1})"
-            f" + {{17'd0, (t2_{tag} >>> {2 * fb}) & 1'b1}};",
+            # 两项均须 signed；unsigned 拼接会把负 t2 的 >>> 变成逻辑右移。
+            f"wire signed [17:0] qr_{tag} = ($signed(t2_{tag}) >>> {2 * fb + 1})"
+            f" + $signed({{1'b0, t2_{tag}[{2 * fb}]}});",
             f"wire signed [17:0] yw_{tag} = lr_{tag} + qr_{tag};",
         ]
     else:

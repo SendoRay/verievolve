@@ -17,6 +17,7 @@ from .dev_run import DevRun, THRESHOLD_SOURCE
 from .evaluate import EvaluationError, aggregate_rows, prepare_case
 from .lower_bittrue import resolve_fir_coefficients
 from .lower_rtl import lower_ddc_rtl
+from .provenance import ProvenanceError, verify_source_record
 from .synthesize import liberty_areas, synthesis_script, validate_mapped_result
 
 
@@ -80,9 +81,14 @@ def verified_areas(root: Path, configs: list[dict]) -> dict:
     if (contract["script"] != synthesis_script(contract["abc"]["path"])
             or hashlib.sha256(contract["script"].encode()).hexdigest() != contract["script_sha256"]):
         raise EvaluationError("不匹配的综合脚本")
-    for record in [*contract["sources"], contract["yosys"], contract["abc"], contract["liberty"]]:
+    try:
+        for record in contract["sources"]:
+            verify_source_record(record)
+    except ProvenanceError as exc:
+        raise EvaluationError("已记录的综合源码无法验证") from exc
+    for record in (contract["yosys"], contract["abc"], contract["liberty"]):
         if _sha(Path(record["path"])) != record["sha256"]:
-            raise EvaluationError("已记录的综合源码/工具/库发生漂移")
+            raise EvaluationError("已记录的综合工具/库发生漂移")
     if _sha(root / "cells.lib") != contract["liberty"]["sha256"]:
         raise EvaluationError("面积库快照不一致")
     frozen = manifest["candidates"]

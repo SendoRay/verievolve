@@ -25,6 +25,7 @@ from .evaluate import EvaluationError, aggregate_rows, evaluate_candidate, prepa
 from .formal_state import FormalState
 from .frontier import hypervolume, grid_values, engineering_hits, paired_bootstrap
 from .pilot import AreaCache, area_key, _artifact_check, _event, _plain, watch
+from .provenance import verify_source_record
 from .validate import IRValidationError, validate_candidate
 from .validate_main import DEFAULT_AREA_RUN
 
@@ -195,9 +196,10 @@ def _calibration_record(contract):
         raise EvaluationError("缺少已通过的固定重复校准")
     old = previous["contract"]
     # 历史来源逐个核对；新增正式模块不回写旧清单，也不使旧证据自动失效。
-    for item in [*old["sources"], old["yosys"], old["abc"], old["liberty"]]:
+    source_provenance = [verify_source_record(item) for item in old["sources"]]
+    for item in (old["yosys"], old["abc"], old["liberty"]):
         if sha(item["path"]) != item["sha256"]:
-            raise EvaluationError("校准来源被修改")
+            raise EvaluationError("校准工具/库来源被修改")
     if any(old[k]["sha256"] != contract[k]["sha256"] for k in ("yosys", "abc", "liberty")) or old["script_sha256"] != contract["script_sha256"]:
         raise EvaluationError("当前综合契约不同于校准")
     baseline = read(DEFAULT_AREA_RUN / "results.json")
@@ -220,7 +222,8 @@ def _calibration_record(contract):
             if row[field] != baseline["rows"][index][field] or row["repeat_matches"][field] is not True:
                 raise EvaluationError("补重复不一致")
         _artifact_check(original, path, sha(path))
-    return {"path": str(CALIBRATION), "sha256": sha(CALIBRATION), "epsilon_A_um2": EPS_A}
+    return {"path": str(CALIBRATION), "sha256": sha(CALIBRATION), "epsilon_A_um2": EPS_A,
+            "source_provenance": source_provenance}
 
 
 class RTLChecks:
@@ -316,7 +319,7 @@ def protocol_spec():
 def _ready(contract):
     if read(PROTOCOL) != protocol_spec():
         raise EvaluationError("正式协议不同于已实现的固定规格")
-    path = ROOT / "refine-logs/FORMAL_S_READY.json"
+    path = ROOT / "refine-logs/FORMAL_S_READY_v2.json"
     gate = read(path)
     if (gate["status"] != "reviewed" or gate["protocol_sha256"] != sha(PROTOCOL)
             or gate["sources_sha256"] != synth._digest(contract["sources"])

@@ -1,0 +1,285 @@
+{
+  "problem_anchor": "在固定通信 DSP 数学/数据流规格与端到端数值契约下，联合选择算法分解、近似原语和定点化，检验它相对强基线能否在相同提案预算内找到更好的质量—真实综合面积折中。不能预设既有方法已造成设计损失，也不能预设 LLM 必要。",
+  "reads": [
+    {
+      "angle": "从研究问题、近邻能力和现有证据出发收紧贡献。只读核对了14份本地材料；未执行实验、综合、搜索或外部查新，也未修改文件。核心判断：现在缺的不是更多模块，而是联合搜索相对强基线确实改善设计选择的证据。",
+      "critical_risks": [
+        "最大证据缺口：局部指标排序反转已经观察到，但冻结26点池没有 decision witness。不能把“排序不同”写成“现有方法造成了设计损失”，更不能把这种损失预设为研究前提。",
+        "新颖性不能靠能力拼接成立。WLO、近似HLS、SPIRAL、Chassis、Daisy、ROVER/ASPEN分别覆盖了大量组成部分；必须指出联合方法相对哪条强路线、因哪项自由度或反馈信息取得了什么可复现增量。",
+        "搜索主张存在需要澄清的比较层级：/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:17-19 提到强通用搜索，而第217-222行的S1前沿判据直接比较的是staged WLO与cost-first extraction。胜过分阶段基线不自动等于胜过同语言GP/beam，也不等于LLM有独特价值；本次不替用户修改或冻结该口径。",
+        "E1只覆盖NCO变化、下游固定的已测对象。加入新FIR结构、量化位置或组合原语后，不能直接复用“线性评价足够”的结论；必须重新校验适用性，或者使用全链bit-true评价。",
+        "文档有明显时间层次：AGENTS与EXPERIMENT_GAPS保留旧叙事，LIT_GAP部分判断已被后续核查收紧；PROPOSAL与SEARCH_PROTOCOL仍标记未冻结，不能因已有代码就视为整个研究协议获准生效。",
+        "真实综合面积不是完整PPA，更不是物理实现优势；当前DDC主风险是特定对齐口径下的样本域实现NMSE，不是完整通信EVM或BER保证。"
+      ],
+      "facts": [
+        {
+          "claim": "最终研究对象是固定通信DSP数学/数据流规格与端到端数值契约下的硬件实现选择：联合改变算法分解、近似原语及定点化，比较质量—真实综合面积前沿。不是任意Verilog生成，也不把流水、资源共享或握手调度作为当前搜索自由度。",
+          "source": "/Users/chengzhy/verievolve/thesis/PROPOSAL_v1.md:11-22；/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:36-68",
+          "status": "2026-09-29至09-30的提案范围；两份文档均未冻结，不是实验结论。"
+        },
+        {
+          "claim": "叙事已发生三次收紧：旧AGENTS强调“解析fitness＋LLM、零采样方差”；DIRECTION/EXECUTION_PLAN转为“通过率丢失数值信息，检验数值反馈是否提高LLM价值”；PROPOSAL进一步转向部署契约下的局部指标不保序，并把评价方法、搜索收益与LLM收益拆成可独立失败的轴。不能再沿旧因果链直接宣布贡献。",
+          "source": "/Users/chengzhy/verievolve/AGENTS.md:15-49；/Users/chengzhy/verievolve/thesis/DIRECTION.md:3-30；/Users/chengzhy/verievolve/thesis/EXECUTION_PLAN.md:9-33；/Users/chengzhy/verievolve/thesis/PROPOSAL_v1.md:150-190",
+          "status": "2026-09-28旧方向与2026-09-29新提案的历史演变；并非整套新提案已获冻结。"
+        },
+        {
+          "claim": "已有近邻占据：系统输出质量驱动固定图WLO（Han–Evans、fxpopt）；近似算子、位宽与调度/绑定联合优化（Li DAC’15、AxHLS）；LLM、已验证RTL重写与综合反馈（ASPEN）。所以“系统级目标”“联合优化”“LLM＋验证＋综合”都不能单独作新颖点。",
+          "source": "/Users/chengzhy/verievolve/thesis/NEIGHBOR_MATRIX_HLS_RTL.md:29-65；/Users/chengzhy/verievolve/thesis/LIT_GAP.md:30-51,64-73",
+          "status": "本地既有文献核查记录；本次未重新取得论文全文或复现其性能。"
+        },
+        {
+          "claim": "Chassis已覆盖精确重写、近似算子lowering与精度/成本Pareto，也对整候选评价精度；Xfp/Daisy已覆盖实数重写、定点误差分析与GP。已有Rosa受限循环分析，因此“非加性整体评价”“定点＋重写”或“有状态程序从未处理”也不成立。",
+          "source": "/Users/chengzhy/verievolve/thesis/NEIGHBOR_MATRIX_HLS_RTL.md:108-136,138-164",
+          "status": "2026-09-29矩阵的已核查近邻能力；Pherbie仍仅摘要级，状态/多速率列明确存在检索不足。"
+        },
+        {
+          "claim": "旧LIT_GAP对SPIRAL“没有定点误差维度”的概括不能继续引用。后续DIRECTION记载：ICCAD’04已有精度驱动跨公式选择，TODAES’12已有公式到RTL，ICASSP’12已有固定FFT的面积—NMSE设计；这些工作不能被合并冒充同一方法，但已足以否定“解析误差从未参与结构选择”。",
+          "source": "/Users/chengzhy/verievolve/thesis/LIT_GAP.md:53-56；/Users/chengzhy/verievolve/thesis/DIRECTION.md:392-450",
+          "status": "2026-09-29的定向核查收紧了2026-09-27的旧概括；不是全面最新查新。"
+        },
+        {
+          "claim": "冻结DDC witness只改变NCO，下游固定；主风险是前导段估计复标量后、在独立数据段测量的实现NMSE，再取冻结主场景栅格上的最大值。正式面积口径为Yosys＋Nangate45 mapped area；无SDC时不将timing/power列为正式证据。",
+          "source": "/Users/chengzhy/verievolve/thesis/WITNESS_FROZEN_DDC_v1.md:3-11,209-258",
+          "status": "2026-09-29已冻结的特定实验契约；不等于PROPOSAL或后续搜索协议也已冻结。"
+        },
+        {
+          "claim": "正式产物支持“有机制、无已证设计损失”：union26内SQNR、WCE、last-bit与SFDR的decision_witness均为false，同时存在strict reversal与collapse；辅助SQNR选型的quality_regret和area_regret_um2均为0。",
+          "source": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/runs/formal-v1-20260930/main_decision.json:43-77,120-154,256-374,417-465；字段metrics.<metric>.pools.union26.decision_witness、strict_reversals、collapses、auxiliary_sqnr_selection",
+          "status": "2026-09-30正式结果；只适用于该冻结候选池与契约，不推出联合搜索失败或成功。"
+        },
+        {
+          "claim": "强线性基线③的Gate A、Gate B均通过，top-{1,3,5} regret均为0，all_registered_failures_explained为true。按冻结分支属于E1：候选特异的相干线性传播已经解释本批机制，不能声称发现新误差理论；其身份仍是经验证近似，不是全链精确公式或上下界。",
+          "source": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/baseline3_v1/results.json:34055-34145,34355-34359；字段gate_a.pass、gate_b.topk、gate_b.all_registered_failures_explained、gate_b.pass；/Users/chengzhy/verievolve/thesis/BASELINE3_PROTOCOL_DDC_v1.md:11-18,81-88",
+          "status": "2026-09-30已完成的评价轴结果E1；不是搜索轴S0/S1。"
+        },
+        {
+          "claim": "typed IR的必要性在于让候选真正可组合、明确类型/速率/状态/量化语义，并给不同提议器同一搜索语言与lowering。未登记的组合能够被通用lowering处理，可以证明表示不是模板编号包装；但这只证明表达与执行能力，不证明更好前沿、更高搜索效率或算法新颖性。",
+          "source": "/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:47-84,124-147,205-213；/Users/chengzhy/verievolve/thesis/NEIGHBOR_MATRIX_HLS_RTL.md:117-136",
+          "status": "必要基础设施与研究贡献的边界判断；精确重写＋近似lowering的抽象组织已有直接先例。"
+        },
+        {
+          "claim": "当前记录已有typed IR、组合NCO和DDC模型—RTL最小闭环；但搜索协议仍未冻结，记录明确未进行该开放结构空间的正式场景评价、正式面积和搜索实验。因此既不能报S1，也不能由旧26点的阴性decision witness报S0。",
+          "source": "/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:1-11；/Users/chengzhy/verievolve/Iknow.md:558-582",
+          "status": "截至2026-09-30所读记录的工程进度；本任务未重复代码审计或运行验证。"
+        },
+        {
+          "claim": "E1之后仍可检验的贡献被提案明确限定为结构特异评价的自动装配、开放结构联合搜索及系统实现证据；是否保留LLM主张取决于额外比较，而不是由物理机制推出。",
+          "source": "/Users/chengzhy/verievolve/thesis/PROPOSAL_v1.md:166-190；/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:191-235",
+          "status": "待证研究假设和结果分支，不是已完成贡献。"
+        },
+        {
+          "claim": "本地近邻矩阵明确不能单独支持领域空白，尚有Pherbie、状态/多速率等核查缺口；旧LIT_GAP的“未发现”只覆盖其当时检索范围。",
+          "source": "/Users/chengzhy/verievolve/thesis/NEIGHBOR_MATRIX_HLS_RTL.md:3-4,95-102；/Users/chengzhy/verievolve/thesis/LIT_GAP.md:3-9,170-183",
+          "status": "文献证据范围声明；本次没有完成最新文献全面查新。"
+        }
+      ],
+      "main_thesis": "真正要做的不是证明“解析fitness＋LLM有效”，也不是把typed IR做大，而是检验：在固定通信DSP数学/数据流规格、端到端数值契约及相同提案预算下，联合选择算法分解、近似原语和定点化，能否比强基线找到更好的质量—真实综合面积折中。E1之后，可证伪的主贡献只剩这条契约驱动的联合设计方法及其可归因收益：自动装配结构相关评价是实现手段，新的前沿点和搜索效率才是待取得证据。当前准确状态是“机制存在、经典线性基线足够、设计损失未证、搜索尚未验证”。",
+      "must_not_do": [
+        "不把草案、代码存在或代理间审阅当作用户已经批准并冻结新协议；不自行变更候选池、阈值、预算或契约。",
+        "不复用旧420对诊断结果证明设计损失；不覆盖负结果，也不事后重选候选对来制造阳性。",
+        "不把近似原语放进精确等价类；不把有限轨迹模型—RTL对拍称为全域形式保证。",
+        "不把typed IR、e-graph、MAP-Elites、LLM或修复评价器本身写成自动成立的研究创新。",
+        "不把随机搜索作为唯一强基线，不让不同提议器获得不同表达能力、免费失败或免费重复提案。",
+        "不为了撑起新误差理论而在E1后人为制造饱和或扩展基线④；新对象是否需要更强模型应由验证决定。",
+        "本次不写文件、不跑实验/综合/搜索/服务、不调用外部LLM或API、不进行git add/commit/push。"
+      ],
+      "non_claims": [
+        "没有证明固定图WLO、分阶段设计或局部指标在本研究契约下已经造成可测设计损失。",
+        "没有证明联合搜索优于强基线，也没有得到S0；未运行搜索不能算负实验。",
+        "没有证明LLM必要、优于GP，或诊断反馈的收益为LLM特有。",
+        "没有发现新误差理论；E1说明已测反转可被经典相干线性传播解释。",
+        "没有证明通用开放结构生成：当前组合空间仍有显式语法、原语和深度边界。",
+        "没有证明完整PPA、布局布线优势、3GPP合规性、连续频域最坏保证或完整收发链泛化。"
+      ],
+      "route": [
+        "先只确认一个研究问题与贡献层级：主问题是联合设计是否改善质量—综合面积前沿；局部不保序是动机，LLM只是可替换提议器。保留冻结witness与E1结果，将尚未冻结的搜索口径交用户审阅，不在本次签发新协议。",
+        "把现有NCO—CMUL—FIR/抽取最小链作为证据载体，不继续堆目录或新模块。typed IR只需足以公平表达真实分解、近似与定点组合，并建立模型—RTL及真实面积可信性；e-graph不是当前必须追加的前置贡献。",
+        "未来比较应分清三件事：联合自由度相对固定图/分阶段WLO的价值；链级质量选择相对Chassis式cost-first路线的价值；提议器相对同语言GP与beam/MCTS的价值。保留系统仿真约束WLO，不能只用局部指标选结构的弱版本代表全部WLO。各方法共用契约与评价后端，失败和重复提案计预算。",
+        "先用非LLM方法检验主搜索假设。正式预算、种子、面积工程阈值和统计办法须事前确认；终点评价用全链bit-true与真实综合面积。若出现前沿改善，还要解释一条可复现的设计选择：哪项被联合改变的自由度使相应受限路线漏掉该点，而不是仅报告系统组件齐全。",
+        "只有主搜索收益成立后，再做提议器×反馈的比较来决定是否保留LLM独特性；只有首链证据成立后，才考虑机制不同的第二条链。E1模型推广到新FIR之前重新验证，验证不过则使用全链评价，不强保解析叙事。"
+      ],
+      "stop_conditions": [
+        "协议、强基线定义、共享预算或评价口径未确认时，停在只读分析与待审方案，不启动正式搜索。",
+        "表示不能真实组合、模型—RTL不一致或缺乏同口径真实综合面积时，不进入研究收益比较；工程测试通过也不能替代收益结果。",
+        "正式搜索若未达到事前确认的工程余量与多种子前沿改进判据，才记S0；停止搜索优势主张、LLM独特性叙事与第二条链扩展，保留负结果。",
+        "只胜过弱分阶段或成本代理基线、未胜过主张所指的强基线时，只能收窄比较结论，不能升级为一般联合搜索优势。",
+        "若LLM交互收益不成立，撤下LLM独特性，将其保留为可替换搜索器；若诊断只做within-LLM对照，不宣称LLM特有。",
+        "若始终只有机制反例而无实际选择或前沿改善，研究应降为机制、评价器或benchmark的边界性工作，不能宣称已经解决硬件设计损失问题。"
+      ]
+    },
+    {
+      "angle": "既有实验的宏观证据审查：只读核对 2026-09-30 正式 DDC witness、强线性基线③及其冻结判据，不审 adapter 实现、不运行新实验。",
+      "critical_risks": [
+        "把“局部指标排序反转”直接写成“局部选择造成设计损失”：当前反转真实存在，但四项指标的主 decision_witness 全为 false，预注册 SQNR 辅助选择的两类 regret 均为 0。",
+        "把 E1 外推到新 FIR/抽取结构：旧实验刻意固定高保真下游；新增乘积丢位、有限累加位宽或不同量化位置后，基线③排除的下游舍入残差及交叉项可能不再可忽略。",
+        "混淆面积对象：旧判定使用 NCO-only Nangate45 mapped area；允许 FIR 结构变化后的联合设计不能拿这一成本冒充全链面积。旧产物没有 SDC，亦不支持时序、功耗或布局布线收益。",
+        "把 26 个已登记 failure 当成 26 个独立实验，或把有限冻结场景上的模型吻合当成一般性定理：同一候选对可能跨指标重复计数；本批不是多种子搜索统计。",
+        "把草案或基础设施完成当作搜索结果：当前证据是评价轴 E1，不是搜索轴 S0/S1，更不是 LLM 有效性证据。"
+      ],
+      "facts": [
+        {
+          "claim": "正式产物确有 2002 条候选×场景记录：main=936、heldout=832、stress=234，对应 26×(36+32+9)。从落盘 rows 只读汇总，CMUL/FIR 饱和计数均为 0，最大 mix_preclip_peak_ratio=0.8078684061765671；epsilon_Q=2.32929922807541e-6。独立 main_decision.json 与 results.json 内嵌 main_decision 完全一致。",
+          "source": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/runs/formal-v1-20260930/results.json::rows,epsilon_Q,main_decision；/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/runs/formal-v1-20260930/main_decision.json",
+          "status": "已从实际产物核实；只聚合已存记录，未重算 truth"
+        },
+        {
+          "claim": "原始计数表（各格依次为 strict reversal 数/collapse 数/decision_witness）如下：\n指标 | legacy6 | v2_20 | union26\nSQNR | 0/0/false | 1/0/false | 3/0/false\nWCE | 0/0/false | 1/0/false | 3/0/false\nlast_bit | 0/0/false | 8/3/false | 10/7/false\nSFDR | 0/0/false | 1/0/false | 3/0/false\n因此 legacy6 未检出超阈保序失败，v2/并集检出了机制反转，但所有池、所有指标均无 decision witness。Iknow 的概括基本吻合，但原始数据还明确包含 last_bit strict reversal，不只是 collapse。",
+          "source": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/runs/formal-v1-20260930/main_decision.json::metrics.{sqnr,wce,last_bit,sfdr}.pools.{legacy6,v2_20,union26}.{strict_reversals,collapses,decision_witness}；/Users/chengzhy/verievolve/Iknow.md:542-547",
+          "status": "已核实；计数是已存列表长度，不是独立统计样本数"
+        },
+        {
+          "claim": "共同机制实例确实存在：v2_cordic7_b16 局部指标更好，但 main Q=0.0001143729761463575，劣于 n1_lut256near_b12 的 0.00010940441437768597，差 4.968561768671522e-6>epsilon_Q。两者 Q 分别为 q_budget 的 4.910188213167378 倍、4.696881064442788 倍；CORDIC7 在四种 union26 局部指标—面积前沿上都不在列。因此该例能说明排序不保序，不能充当预注册决策损失见证。",
+          "source": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/runs/formal-v1-20260930/results.json::aggregate.main；/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/runs/formal-v1-20260930/main_decision.json::metrics.*.pools.union26.{strict_reversals,local_area_front}；/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/preflight_manifest.json::quality_contract.calibration.q_budget",
+          "status": "实际 Q、列表和阈值已核实；预算倍数由已存数值只读计算"
+        },
+        {
+          "claim": "预注册主 pair 仍是 v2_lut512near_b16 与 v2_cordic8_b16，pair_selection.q_blind=true。其 main Q 分别为 3.27362955299273e-5、3.418376897719962e-5，绝对差 1.4474734472723211e-6<epsilon_Q；因此主对没有超阈 strict reversal/collapse。局部 SQNR 分别为 44.58824775500641、46.976135312974534 dB，所以虽然排序方向发生亚阈值翻转，不能升级为阳性。冻结文件中 nearest512≈49.0 dB 是运行前纸面估算，不是实测值。",
+          "source": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/frozen_inputs_v1/pair_selection.json::{q_blind,selected}；/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/frozen_inputs_v1/local_metrics.json::rows[name].mcore_sqnr_db；/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/runs/formal-v1-20260930/results.json::aggregate.main；/Users/chengzhy/verievolve/thesis/WITNESS_FROZEN_DDC_v1.md:44-52",
+          "status": "预注册对象与实际阴性结果已核实；未以其他 pair 替换"
+        },
+        {
+          "claim": "旧 26 点池的预注册 SQNR 辅助选择确为零 regret：target_sqnr_db=46.327747172383724，选中 v2_lut1024lin_b10，Q=3.334888159230211e-6、area_um2=1162.42；quality_regret=0.0，area_regret_um2=0.0。两个受约束参考点都是它自身。此结论只适用于这条固定规则与候选池，不能概括为任意局部选择方法的 regret 都为零。",
+          "source": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/runs/formal-v1-20260930/main_decision.json::auxiliary_sqnr_selection；/Users/chengzhy/verievolve/thesis/WITNESS_FROZEN_DDC_v1.md:254-263",
+          "status": "已核实的局部选择负结果"
+        },
+        {
+          "claim": "强线性基线③ Gate A 通过：main+heldout 共 1768 点，max |q3−q_true|=8.962187760598898e-8<epsilon_Q，仅为阈值的 0.03847589718219213 倍；nearest LUT、linear LUT、CORDIC 三类分别通过。Gate B 也通过：top-1/3/5 regret 全为 0，false_feasible=[]，max_budget_violation=0，tau-b=1.0；26 条已登记 union26 failure 的 explained 全为 true。stress 不参与这些 gate。",
+          "source": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/baseline3_v1/results.json::gate_a,gate_b；/Users/chengzhy/verievolve/thesis/BASELINE3_PROTOCOL_DDC_v1.md:42-79",
+          "status": "实际 gate 与逐条解释结果已核实；阈值占比由已存数值计算"
+        },
+        {
+          "claim": "按 2026-09-29 witness 冻结分支与 2026-09-30 baseline③冻结判据，本批应归 E1：存在保序失败，且经典、候选特异的相干线性传播已在工程容差内解释它们。E1 是由实际 gate 与规则推出，并非 results.json 里一个单独的 evaluation_axis 字段。它支持在本冻结域内把③称为经过验证的近似模型/排序代理，不支持声称③对整链 bit-true q 精确，也没有必要仅为解释本批结果启动④。",
+          "source": "/Users/chengzhy/verievolve/thesis/WITNESS_FROZEN_DDC_v1.md:54-59,265-280；/Users/chengzhy/verievolve/thesis/BASELINE3_PROTOCOL_DDC_v1.md:11-18,81-88；/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/baseline3_v1/results.json::gate_a.pass,gate_b.pass",
+          "status": "由已核实结果及冻结判据支持的范围限定结论"
+        },
+        {
+          "claim": "旧 E1 的适用对象是只改 NCO、固定 f1_c16+c1_exact_rne 下游：FIR wc=16、wacc=0、prod_drop=0、mode=rne，CMUL prod_drop=0、mode=rne，R=2、phase=0。③保留量化 FIR 系数和相干传播，却排除 CMUL/FIR 数据通路 round/sat residual。旧面积契约是 NCO-only、top=nco_map、Nangate45 mapped area、sdc=null，timing_power_claims_allowed=false。",
+          "source": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/preflight_manifest.json::fixed_downstream；/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/runs/formal-v1-20260930/results.json::synthesis_contract；/Users/chengzhy/verievolve/thesis/BASELINE3_PROTOCOL_DDC_v1.md:11-40",
+          "status": "实际契约已核实；是新 FIR 结构不能自动继承 E1 的关键边界"
+        },
+        {
+          "claim": "引用链的一致性检查通过：baseline③引用的 truth SHA-256 与当前实际 truth 文件一致；baseline 协议 SHA-256 一致；truth/baseline 的 execution manifest 引用、preflight 引用以及 local/pair/area 冻结输入哈希均一致。这支持当前各文件属于同一证据链，但不等于本次重新审计了生成代码或重现了实验。",
+          "source": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/baseline3_v1/results.json::{truth,protocol,execution_manifest}；/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/runs/formal-v1-20260930/results.json::execution_manifest；/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/frozen_inputs_v1/execution_manifest.json::{preflight,inputs}",
+          "status": "只读文件哈希核验通过；不是实验重跑证明"
+        },
+        {
+          "claim": "文档时间层次明确：witness 是 2026-09-29 冻结协议；baseline③协议的“尚未运行”是冻结时快照，不能覆盖其后已存在的 2026-09-30 结果。Iknow 2026-09-30 的 E1 摘要与实际数据吻合；同日搜索协议仍写 v0.1 草案、尚未冻结，不得据此启动正式搜索。Iknow 最新实现记录明确尚未运行搜索、新 IR 的冻结 truth 或正式 Nangate45 面积；这部分只是进度记录，本审查未通过代码搜索独立验证全部实现状态。",
+          "source": "/Users/chengzhy/verievolve/thesis/WITNESS_FROZEN_DDC_v1.md:3-10；/Users/chengzhy/verievolve/thesis/BASELINE3_PROTOCOL_DDC_v1.md:3-7；/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:1-10,160-162；/Users/chengzhy/verievolve/Iknow.md:550-582",
+          "status": "冻结状态、实际结果与进度摘要分开引用；未将摘要冒充新实验"
+        }
+      ],
+      "main_thesis": "宏观上要验证的不是“局部指标一定害人”，也不是“LLM 必不可少”，而是：在固定通信 DSP 数学/数据流规格与端到端数值契约下，联合选择算法分解、近似原语和定点化，能否相对强基线在相同提案预算内找到更好的质量—真实综合面积折中。当前证据把起点限定为：旧 NCO 固定池有机制反转、无已证决策损失，且经典相干线性基线足以解释，即评价轴 E1；联合结构搜索是否值得做、是否有效，仍是待检验问题。",
+      "must_not_do": [
+        "不得把 AGENTS.md 2026-09-28 中旧 420 对等历史诊断数字混入修复后的正式证据，也不得把“现有方法必然损失设计点”当成已证前提。",
+        "不得改写主 pair、候选池、阈值或冻结协议以追求阳性；其他 pair 的机制阳性不能替代预注册主 pair 阴性。",
+        "不得把零 decision witness 说成没有可探索的新结构空间；也不得把存在机制反转说成联合搜索必将获益。",
+        "不得在新增 FIR/抽取量化结构上直接复用旧 E1 通行结论，或用 NCO-only 面积评价联合全链结构。",
+        "不得把 proposed S1/停止条件当作本次已替用户冻结的协议；不得把基础设施、单测、smoke 或未跑的搜索写成 S0/S1。",
+        "本任务不写文件、不运行 truth/综合/实验/服务、不调用外部 LLM/API、不修改配置或 Git 状态。"
+      ],
+      "non_claims": [
+        "没有证明局部 SQNR/WCE/SFDR/last-bit 筛选在当前旧池上造成符合预注册判据的设计损失。",
+        "没有证明经典误差传播理论失效，更没有证明需要一种新误差理论。",
+        "没有证明联合搜索优于分阶段字长优化、枚举切片、GP、beam/MCTS 等强基线。",
+        "没有任何证据在本任务中支持 LLM 必要性、独特结构发现能力或同预算优势。",
+        "没有证明新 FIR/polyphase/phasor-compose 结构仍处于 E1，也没有证明其必然进入 E2/E3。",
+        "没有把冻结离散栅格 worst 扩张为连续频率最坏情形，或把 sample-domain implementation NMSE 称作标准符号域 EVM。"
+      ],
+      "route": [
+        "先固定研究问题的可证伪形式：比较的是同任务、同契约、同表示/合法动作与同提案预算下的质量—面积前沿；不要先写现有方法失效或 LLM 优越的故事。",
+        "把本批结果作为可复现的评价基线和边界材料保留：完整报告 legacy6、v2_20、union26、主 pair 阴性、零 decision witness 与零辅助 regret；无需继续从旧池挑机制例子制造贡献。",
+        "在未来获得正式执行许可并冻结搜索方案后，优先检查新的结构自由度是否产生真实、可比较的质量—全链综合面积差异；精确等价的实数分解本身不等于定点实现等价，更不等于有搜索收益。",
+        "每引入新 FIR/抽取类，先检验候选特异的③能否继续通过适用的 Gate A/B；若不适用，按预先约定的边界使用完整 bit-true 评价或检验④，不为保住 E1 标签调整阈值。",
+        "先以强非 LLM 基线检验联合结构搜索的研究假设；只有正式同预算、多种子和 held-out 结果支持前沿改善后，才单独问 LLM 是否提供增量。当前这些是建议的验证顺序，不是已经批准或冻结的新实验。"
+      ],
+      "stop_conditions": [
+        "当前应停止“已证明局部设计损失”“新误差理论必要”“LLM 必要”的结论性表述；旧结果不支持它们。",
+        "正式搜索协议、预算、种子统计和面积可比性尚未冻结，或表示/数值/RTL 可信性未满足预注册要求时，不启动正式搜索判定；当前不能先宣布 S0。",
+        "新 FIR 类使③未通过适用 gate 时，停止在该类上把旧 E1 当有效依据；模型近似失效不等于整个联合搜索方向已失败。",
+        "未来若按获批且预注册的规则检验后，联合结构搜索相对强基线没有超过误差/面积容差的稳定前沿收益，应如实接受搜索负结果，停止以加任务、改阈值或引入 LLM 追逐阳性。"
+      ]
+    },
+    {
+      "angle": "方法设计与证据边界：先验证“联合数值选择是否值得做”，再验证“LLM 是否带来额外收益”；压缩为三个验证块，不把基础设施完成度当作研究结论。以下是只读分析和待审阅建议，不是协议冻结或实验启动授权。",
+      "critical_risks": [
+        "最重要的概念纠正：固定合法实现集合 H、契约 C 和评价函数 (Q,A) 后，真正的 Pareto 集合 F* 不依赖搜索器。可以比较的是提案预算 B 内找到的前沿 F̂_B，以及其质量、覆盖和成本。若换表示扩大 H，改变的是可表达集合，不能把这种变化算成 proposer 的贡献。",
+        "表示、反馈、proposer 不能一起更换后做因果归因。表示消融只改变构造能力；反馈比较固定表示和 proposer；proposer 比较固定表示、反馈及公共搜索设施。主比较中所有搜索器必须能访问同一组合能力，不能只有我方获得新结构。",
+        "协议的 satisfaction 和 numerical 都源于同一链级 q；两者对照隔离的是连续数值信息相对于 verdict/pass-count 的作用，不是“局部评价→系统评价”的作用。staged-local 与 joint-system 的直接比较又同时改变了决策顺序和反馈。若要独立主张系统上下文收益，尚需经审阅的匹配对照；当前不能从这两种比较自动推出。",
+        "S1 的比较对象存在待澄清处：/Users/chengzhy/verievolve/thesis/PROPOSAL_v1.md §5 将同语言 GP 列入强基线，/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md §6.2 的具体判据主要列 staged WLO 与 cost-first。GP 若就是联合搜索的执行器，不能又被描述成该方法击败的独立算法。正式前应明确 S 验证的是联合决策策略，还是另有一个待比较的新搜索机制。",
+        "旧 E1 只覆盖 NCO 变化、下游固定的契约。FIR 结构、系数量化和量化位置变化后，不能直接继承其精度与排序结论；否则搜索可能优化训练评价器的偏差，而不是真实全链质量。",
+        "当前旧池面积是 NCO-only，不能代替开放结构候选的整条 DDC 综合面积。固定外部数值契约也不自动证明部署吞吐相同；未冻结时序约束时，只能声称指定综合流程下的面积折中，不声称 timing、power、PPA 或物理实现优势。",
+        "统计独立单位应是预先登记的搜索运行，而不是同次运行中的候选、候选对或场景数。hypervolume 的尺度、参考点和终考规则不能看完结果再选；held-out 不得用于回选候选和调阈值，已经揭示过的历史 held-out 也不能冒称全新盲测。",
+        "typed IR、确定性 lowering、经典线性传播与通用搜索器接通，本身目前仍是工程整合。若没有可复现的设计选择收益、可定位的作用机制和明确的适用边界，不能因为组件多就认定论文贡献成立。"
+      ],
+      "facts": [
+        {
+          "claim": "2026-09-28 的 AGENTS/实验缺口材料包含旧的解析适应度叙事和旧诊断结果；其证据纪律仍适用，但旧方向措辞不能覆盖更新后的研究状态。",
+          "source": "/Users/chengzhy/verievolve/AGENTS.md:10-49、83-94；/Users/chengzhy/verievolve/EXPERIMENT_GAPS.md:10、40-91",
+          "status": "历史方向与证据规范；不是当前搜索结果"
+        },
+        {
+          "claim": "2026-09-29 的主线提案明确联合选择算法分解、近似原语和定点化；流水、共享和握手微结构由确定性后端负责。文件仍标记提案、未冻结。",
+          "source": "/Users/chengzhy/verievolve/thesis/PROPOSAL_v1.md:1-31、84-91",
+          "status": "研究锚点与待证方法，不是已证贡献"
+        },
+        {
+          "claim": "CONTRACT_DDC_v1 的页首仍为草案；已有 witness 的冻结身份来自 WITNESS_FROZEN_DDC_v1 及执行 manifest。这个冻结对象仅限 NCO 变化、下游固定，不等于搜索协议已冻结。",
+          "source": "/Users/chengzhy/verievolve/thesis/CONTRACT_DDC_v1.md:1-8；/Users/chengzhy/verievolve/thesis/WITNESS_FROZEN_DDC_v1.md:1-11；/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/frozen_inputs_v1/execution_manifest.json:2-24",
+          "status": "已登记的 witness 契约与运行身份；不构成本次运行授权"
+        },
+        {
+          "claim": "2026-09-30 首轮 witness 的 26 点池出现局部排序失败，但登记的 decision_witness 均为 false；辅助 SQNR 选择的 quality_regret 和 area_regret_um2 均为 0。不能声称局部指标已造成设计损失。",
+          "source": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/runs/formal-v1-20260930/results.json：witness_analysis 下各指标/pools 的 decision_witness 字段，及 auxiliary_sqnr_selection；/Users/chengzhy/verievolve/Iknow.md:542-547",
+          "status": "实际结果；范围限定于旧 witness 池"
+        },
+        {
+          "claim": "强线性基线的 gate_a.pass、gate_b.pass 和 gate_b.all_registered_failures_explained 均为 true；按登记的分支规则属于 E1，即经典 candidate-exact 相干线性传播足以解释本批结果。",
+          "source": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/baseline3_v1/results.json:34055-34110、34355-34359；/Users/chengzhy/verievolve/thesis/BASELINE3_PROTOCOL_DDC_v1.md:81-88",
+          "status": "实际评价结果；不支持新误差理论"
+        },
+        {
+          "claim": "2026-09-30 搜索协议仍为未冻结草案，规定共同 IR/动作/预算、先非 LLM 后 LLM，以及 S/L 分支；尚不能据其启动正式搜索。",
+          "source": "/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:1-11、124-147、191-235",
+          "status": "待审阅的验证协议"
+        },
+        {
+          "claim": "最新知识记录报告 typed IR 已有模型—RTL 最小整链与背压测试，但明确未完成新 IR 候选的冻结场景评价、Nangate45 正式面积和搜索实验。因此当前搜索轴尚未判定，既不是 S0，也不是 S1。",
+          "source": "/Users/chengzhy/verievolve/Iknow.md:567-582；/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:9-11",
+          "status": "已有工程进度记录；本任务未审计底层实现"
+        }
+      ],
+      "main_thesis": "要做的不是证明 LLM 必要，也不是先认定传统流程有损失，而是检验：在固定通信 DSP 数学/数据流规格与端到端数值契约下，允许算法分解、近似原语与定点化联合选择，能否在相同提案预算内，相对可信的分阶段方法和强通用搜索，找到更好的质量—真实整链综合面积折中。当前 E1 提供了评价机制依据，但设计收益与搜索收益仍待证明。",
+      "must_not_do": [
+        "本次不写文件，包括不追加 /Users/chengzhy/verievolve/Iknow.md；不运行实验、truth、综合或服务，不调用外部 LLM/API，不执行 git add/commit/push。",
+        "不重复另一审计 workflow 的 typed IR、adapter、cache、manifest 和预算实现搜索；实现门是否通过交由该审计提供证据。",
+        "不自行冻结搜索协议、面积阈值、统计方法、预算、样本数或候选名单；不把技能模板的默认种子数变成项目决策。",
+        "不给我方独占的更大表示空间、更丰富诊断、更有利初始点或免费失败重试；重复、非法、lowering/综合失败都按同一规则计入提案尝试。",
+        "不用 exact-match 全失败或随机搜索作为唯一对手制造优势；不将 Chassis-like、fxpopt-style 的内部实现冒称完整复现并击败原论文系统。",
+        "不为追求阳性改变契约、降低阈值、挑选场景或扩展第二条链；不把旧诊断数字、单次成功或基础设施测试当作正式搜索收益。"
+      ],
+      "non_claims": [
+        "不声称同一实现空间的真实 Pareto 集合会因搜索器变化；所谓“改善前沿”只能指有限预算找到的前沿，或另行明确标注的表示覆盖变化。",
+        "不声称现有局部指标已造成设计损失；mechanism witness 不等于 decision witness。",
+        "不声称 E1 是新的误差理论，也不声称它对新 FIR 结构自动有效。",
+        "不声称 LLM 对结构组合必需；强非 LLM 搜索本就能使用组合构造器和结构变换。",
+        "不把 numerical 相对 satisfaction 的收益等同于系统上下文本身的收益；二者都是链级反馈。",
+        "不声称现阶段已具有独立的新搜索算法或已达到论文发表门槛；即使 S1 成立，也还需要准确定位区别机制与已有工作的边界。"
+      ],
+      "route": [
+        "验证块一：建立一个可信且公平的最小 DDC 闭环，并只检验表示能力。对象固定为 phase accumulator→sincos→complex multiply→FIR→R=2；同一候选从 typed IR 生成 bit-true 模型与 RTL，按同一契约得到 q/Q，按同一工具流得到全链 mapped area，再交给公共 archive。候选身份、场景、工具版本、失败和预算记录必须可追溯，但这里不重复实现审计。表示门要求已有叶子、真实不同的 FIR/抽取结构及未手工登记组合能够走相同路径；通过只说明可表达和可评价。表示收益可在协议允许的可枚举切片中做受控诊断：固定评价器与搜索器，只开关组合构造能力，限制对所有 proposer 一视同仁，区分可表达集合的变化与有限预算未找到。切片参考最优不外推到整个开放空间，也不作为某个 proposer 的免费历史数据。该块必须先过，但不是论文主结果。",
+        "验证块二：S 阶段完全不用 LLM，回答联合决策是否产生实际价值。在共同完整 IR、初始种群、预算、公共 archive 和同一全链终考下，用同语言 GP 及 beam/MCTS 中协议要求的强搜索器实施联合 numerical search；对照 staged WLO、固定图系统级 WLO 和 Chassis-like cost-first extraction。固定图 WLO 必须能利用链级质量调位宽，不能仅用局部误差把它弱化；所有结构选择和搜索尝试统一计费。用同一非 LLM proposer、同一 numerical 反馈下的分阶段锁定与联合修改对照隔离决策顺序；用同一联合 proposer 的 satisfaction/numerical 对照隔离反馈信息量，不能用一张混合对比表包办归因。决定性证据是搜索结束后固定输出在 held-out full-chain truth 上的质量—面积前沿：工程余量的新点加正式多种子前沿差，而非仅有排序反转。SEARCH_PROTOCOL 草案提出 epsilon_Q/epsilon_A 的工程门及归一化 hypervolume 差的 95% 区间下界为正；这里只引用草案，epsilon_A、参考点、预算与统计细节仍须审阅冻结。结果还应能定位到具体结构—量化组合为何改变了设计选择。若联合 GP 本身就是方法实例，就承认它是执行器，不虚构“超过同配置 GP”的贡献。",
+        "验证块三：只有正式 S1 后才进入 L 阶段，检验 proposer×反馈交互。按协议做 LLM/强同语言非 LLM × satisfaction/numerical 的完整 2×2，保持表示、动作、初始条件、选择设施、成本可见性和终考相同；不能只给 LLM numerical 或额外诊断。以同一个预注册前沿统计量 H 计算交互 Δ=[H(LLM,numerical)−H(LLM,satisfaction)]−[H(nonLLM,numerical)−H(nonLLM,satisfaction)]，同时报告 numerical 条件下 LLM 对强非 LLM 的直接差异。正交互并不保证 LLM 绝对更好，更不能证明其不可替代；token、调用数和墙钟作为额外成本如实报告。诊断反馈不是启动项；若后续确有必要，只作为本块内 within-LLM 的消融，不能由其阳性宣称 LLM 特有收益。最终成稿需要的是可区分的机制、可信的设计收益与失败边界，不是把 LLM 放到现有闭环顶部。"
+      ],
+      "stop_conditions": [
+        "协议与状态门未澄清就不启动：尤其是搜索协议尚未冻结、S1 对强基线的定义不一致，以及公共最小闭环和正式全链综合证据尚未齐备。现状记“搜索尚未判定”，不能提前记 S0。",
+        "若新结构上的模型—RTL/契约评价不一致，或候选通过改变外部任务、样本映射或未声明性能条件换面积，则停止解释搜索结果，先纠正并版本化证据；修复本身不算创新。",
+        "若 E1 训练模型对新 FIR 类不能通过适用性校验，停止复用该模型作为可信训练评价，改用协议允许的全链 bit-true 路径；不得把其偏差放大成搜索收益。",
+        "正式 S 检验达不到经审阅冻结的工程余量与统计判据，则按协议记 S0，停止 LLM 独特性路线和第二条链扩张，保留负结果；不能缩阈值或另挑任务救主张。",
+        "若收益只来自扩大候选语言，给强基线相同组合能力后即消失，则只保留表示覆盖贡献；若只是联合 GP/beam 优于弱分阶段流程，则只主张这套联合决策在所测条件下有效，不宣称新 proposer。",
+        "若 L 阶段无预注册交互收益，LLM 降为可替换搜索器；即使交互阳性但绝对表现或成本不优，也不声称 LLM 必要。若始终无法指认超出工程整合的机制与可复现收益，应停止强化论文叙事，重新评估能否成稿，而不是承诺发表。"
+      ]
+    }
+  ],
+  "synthesis": "## 一、到底要做什么\n\n**在固定通信 DSP 数学／数据流规格与端到端数值契约下，联合选择算法分解、近似原语和定点化，检验它能否在相同提案预算内，相对强基线找到更好的质量—真实综合面积折中。**\n\n重点不是“再搭一个 LLM 生成硬件的平台”，也不是“证明传统方法一定有问题”。现在真正缺的是：\n\n> **一个可信、可复现、能够归因的设计收益，而不是更多模块或更多排序反转实例。**\n\n这里的“改善前沿”指**有限预算内找到的前沿更好**。固定合法实现集合和评价函数后，真实 Pareto 前沿不会因为换搜索器而改变；扩大表示空间与提高搜索效率必须分开报告。\n\n## 二、我们实际站在哪里\n\n| 日期与证据 | 当前状态 | 可以得出的结论 |\n|---|---|---|\n| 2026-09-28，[旧方向记录](/Users/chengzhy/verievolve/AGENTS.md) | 曾强调“解析 fitness＋LLM”“首次让精度成为搜索维度” | 是历史研究叙事，不能继续当作已证贡献；其中证据纪律仍须遵守 |\n| 2026-09-29，[主线提案](/Users/chengzhy/verievolve/thesis/PROPOSAL_v1.md) | **提案，未冻结** | 明确了联合设计问题，并不意味着方法已经有效或协议已经获准执行 |\n| 2026-09-29—30，已冻结的 DDC witness 与正式结果 | 旧 26 点池出现局部排序反转，但各指标的 `decision_witness=false`；辅助 SQNR 选择两项 regret 均为零〔1〕 | **有机制反例，没有符合登记判据的设计损失证据** |\n| 2026-09-30，强线性基线③结果 | Gate A/B 通过，登记的保序失败均被解释〔2〕 | 属于 **E1：经典相干线性传播在本冻结对象内已经足够**，不是发现新误差理论 |\n| 2026-09-30，[搜索协议](/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md)与[最新进度记录](/Users/chengzhy/verievolve/Iknow.md) | 已有 typed IR 和模型—RTL 最小闭环；搜索协议仍未冻结，新空间正式评价、全链面积和搜索尚未完成 | 工程在推进，但**搜索轴尚未判定，既不是 S0，也不是 S1** |\n\n结果来源：\n\n- 〔1〕`/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/runs/formal-v1-20260930/main_decision.json`：`metrics.*.pools.union26.decision_witness`、`auxiliary_sqnr_selection.{quality_regret,area_regret_um2}`。\n- 〔2〕`/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/baseline3_v1/results.json`：`gate_a.pass`、`gate_b.pass`、`gate_b.all_registered_failures_explained`。\n\n**旧结果既不能证明联合搜索必然成功，也不能证明它已经失败。**\n\n## 三、贡献应该收敛到什么\n\n### 唯一主贡献候选\n\n**一套契约驱动的联合硬件设计方法，以及它相对明确强基线的、可归因的有限预算收益。**\n\n“可归因”意味着：不仅找到一个好点，还要解释**哪几项结构与定点选择必须一起改变，哪个对照为何没有找到它**。不能只是我方候选语言更大、反馈更多或者失败尝试不计费。\n\n### 唯一支持项\n\n**从候选结构自动建立可验证的链级评价与 RTL 实现路径。**\n\n它支撑比较可信，但目前首先是基础设施，不应自动升级为独立创新。\n\n必须撤下三种过强叙事：\n\n- **“误差谱经过混频、滤波和抽取导致排序变化，是新理论。”** 这是已有机制，本批 E1 更直接否定了这种包装。\n- **“typed IR＋近似 lowering＋综合反馈，就是新方法。”** 本地[近邻核查](/Users/chengzhy/verievolve/thesis/NEIGHBOR_MATRIX_HLS_RTL.md)已经显示，WLO、Chassis、Daisy、近似 HLS 等覆盖了大量组成能力。\n- **“这些组合需要语义理解，所以必须使用 LLM。”** 同语言 GP、beam 等同样可以操作组合构造器。LLM 的价值只能另行比较。\n\n## 四、最小机制：怎么做才不继续膨胀\n\n保留现有 **NCO→复乘→FIR／抽取** 作为最小证据载体。\n\n候选同时描述算法分解、近似原语和定点语义。搜索不提前永久锁死结构，而允许结构与量化配置共同修改。每个候选经过同一条路径：\n\n**合法性检查 → 全链 bit-true 数值评价与真实整链面积综合 → 保留质量—面积非支配候选 → 下一次联合提案。**\n\n其中：\n\n- 实数恒等分解与近似实现严格分开，不能把近似原语放进精确等价类。\n- typed IR 只需支撑足够的真实组合，不追求无限表达能力。\n- 优先复用强非 LLM 搜索器，不先发明新搜索器。\n- 旧 E1 只覆盖“改变 NCO、下游固定”。新增 FIR 结构或量化位置后，必须重新验证模型适用性；不通过就使用全链 bit-true 评价。\n- 旧 **NCO-only 面积不能代替整链面积**。接口、采样关系与声明的性能条件必须可比；没有冻结时序／功耗流程，就只谈指定综合流程下的面积。\n\n**这条闭环是待验证的方法实现，不是已经成立的新搜索算法。**\n\n## 五、只保留三项验证，每项都允许推翻主张\n\n### 验证一：这些候选是否真的可比较？\n\n**做什么：**确认不同结构、未逐个手写登记的组合，都能走公共模型—RTL—评价—综合路径；各方法获得相同组合能力，失败与重复提案统一计费。具体实现审计交给已有工作，不在这里重复。\n\n**反证：**模型与 RTL 不一致、靠改变外部任务换面积、只有我方能表达某些结构，或者缺少全链正式面积。\n\n**后果：**停止解释搜索收益，先解决可信性问题。**这项通过只代表具备实验资格；未通过也不是实证 S0。**\n\n### 验证二：不用 LLM，联合设计是否真的有价值？\n\n这是主实验，而不是 LLM 实验的铺垫。\n\n**强对照至少覆盖：**\n\n- 能使用**系统级质量约束**调字长的固定图 WLO，而不只是局部误差筛选；\n- 可信的分阶段结构选择／定点优化与 cost-first 路线；\n- 共享完整组合语言的 GP，以及 beam／MCTS 中的强搜索器。随机搜索只能补充，不能充当唯一对手。\n\n**关键归因：**固定同一个非 LLM 搜索器和链级数值反馈，比较“分阶段锁定”与“联合修改”。受限自由度是明确的对照条件，不能冒充同表达能力的强搜索比较。\n\n**决定性证据：**在事前确认的预算、工程余量和统计规则下，多次独立搜索运行得到稳定前沿收益；最终固定输出经未参与调参的留出评价与真实整链面积复核，并能解释具体设计选择。\n\n**反证：**\n\n- 给强对照相同组合能力后，收益消失；\n- 只胜过弱随机、弱局部筛选或成本代理；\n- 只有单次好点，或收益在全链终考中消失；\n- 正式有效实验未达到预注册成功判据。\n\n这些情况只能收窄或撤回相应主张。只有完成有效的正式检验后，才可以按确认的规则记 S0。\n\n**当前必须先澄清一个逻辑缺口：**草案一处要求超过强通用搜索，具体 S1 判据却主要比较 staged／cost-first。如果 GP 本身就是联合方法的执行器，就不能再声称“该方法击败同配置 GP”。若确实要主张优于强通用搜索，必须先说明额外的方法机制是什么，而不是偷偷把答案换成 LLM。\n\n### 验证三：仅在主收益成立后，LLM 是否增加价值？\n\n**做什么：**在相同表示、动作、初始条件和预算下，比较“LLM／强非 LLM × 连续数值／满足性反馈”的完整对照，同时报告调用、token 和墙钟成本。\n\n**反证：**没有交互收益，或者 LLM 在数值反馈下并不优于强非 LLM、成本又更高。此时撤下独特性主张，将 LLM 保留为可替换提议器。\n\n注意两点：\n\n- 正交互不等于绝对表现更好，更不证明“不可替代”。\n- 连续数值与满足性反馈都来自同一链级质量；它们比较的是**信息量**，不是“局部评价对系统评价”。\n\n这项验证不应反过来绑架主问题，也不作为额外主贡献扩张路线。\n\n## 六、先后依赖与立即取舍\n\n**先明确比较命题与待审协议 → 补齐最小可信性门槛 → 非 LLM 正式验证 → 有收益后才研究 LLM；第二条链更晚再考虑。**\n\n立即需要完成的是三个决策，而不是再增加目录：\n\n1. **明确 S 阶段到底比较什么。** 联合决策策略、表示覆盖，还是一个独立的新搜索策略，不能混成一个“我方方法”。\n2. **明确怎样的结果值得继续。** 强基线、预算单位、面积对象、工程余量、独立运行与留出评价规则，正式运行前确认；本次不代替用户冻结。\n3. **利用已有工程审计补齐实验资格。** 不重复造基础设施，不把单测通过写成论文结果。\n\n暂不做：继续从旧池挑反转、为了新理论刻意制造饱和、扩大算子目录、增加 e-graph／诊断模块、接入 LLM，或先写“已经优于现有方法”的故事。\n\n## 七、剩余学术风险\n\n最大风险不是做不出系统，而是**做出的系统仍然只是已有能力的工程整合**。即使联合 GP 胜过分阶段流程，也未必足以支持新搜索算法或广泛新颖性；仍需证明具体增量与适用边界。\n\n此外，单条链、有限结构语法与离散场景不能外推为通用通信硬件优势；当前样本域实现 NMSE 也不是完整 EVM／BER 保证。历史上已经揭示过的 held-out 不能再宣称全新盲测。\n\n**最终判断：方向可以继续检验，但现在应优先获得“联合选择确实改变了有价值的设计决策”的证据，而不是继续增强“解析评价＋LLM”的叙事。**\n\n本结论是对所提供三份审查及本地材料抽查的综合与内部独立审查，不是外部 GPT 评分，也不是完整查新；未修改文件、运行实验或冻结新协议。",
+  "limitations": "只读本地研究材料和既有产物；未改协议、未跑新实验、未完成外部模型评审或在线全面查新"
+}

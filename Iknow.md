@@ -580,3 +580,124 @@ NCO（数控振荡器，也就是正弦发生器）有好几种硬件做法：�
 - 新增真实停顿测试：在第一个有效 DDC 输出保持 `out_ready=0` 三拍，验证 `in_ready=0`、输出数据稳定且下一输入未被提前接受；恢复后继续输入，输出序列与 bit-true Python 模型逐点一致。direct-symmetric 与 polyphase 两个候选均通过（2 passed）。
 - valid/ready 修复后的 FIR/DDC 回归为 21 passed；仍未跑冻结 truth、Nangate45 面积或任何搜索实验。下一步仍是 candidate manifest/evaluator 接口与冻结综合缓存键，之后才做 R4 正式面积和非 LLM pilot。
 - 随后完整相关回归（search_ir schema/lowering/FIR/DDC、DDC metrics/scenarios、witness preflight、NCO RTL equivalence）共 87 passed，未启动冻结 truth、Nangate45 面积或搜索实验。
+
+## 2026-09-30 宏观主线复核：先证明设计收益，再扩实现
+
+- 研究目标不是补齐“IR+LLM平台”，而是检验固定通信任务、数值契约与提案预算下，联合结构/近似/定点化能否改善质量—真实综合面积选择；typed IR 与模型—RTL闭环只是比较资格。
+- 已只读核对正式 `main_decision.json::metrics.*.pools.union26.decision_witness` 均为 false，辅助 SQNR 选择两类 regret 为 0；`baseline3_v1/results.json::gate_a.pass/gate_b.pass` 均为 true，支持 E1。当前是“机制存在、经典基线足够、设计损失未证、开放搜索尚未验证”，不能报 S0/S1。
+- 搜索草案存在比较层级待澄清：目标涉及强通用搜索，但 S1 具体判据主要比较 staged/cost-first。若用 GP 执行联合搜索，就不能再声称击败同配置 GP；建议 S 先固定强非 LLM 引擎检验“联合修改 vs 分阶段锁定”，LLM 增量留到 L。此为待审建议，未改冻结协议。
+- 区分表示可达集合、决策/反馈、提议器三个变量；同一空间与评价下，算法改变的是有限预算发现的前沿，不是真实 Pareto 集合。WLO 强基线应允许系统级质量约束；numerical/satisfaction 检验信息量，不等于局部/系统评价对照。
+- 最小顺序：明确比较命题→补最小可信闭环→非 LLM 正式 S 检验→仅 S1 后测 L。新 FIR 不自动继承旧 E1，旧 NCO-only 面积不代替全链成本，已被查看的历史 held-out 不称全新盲测。
+- 详见 `refine-logs/FINAL_PROPOSAL.md`；本轮仅本地材料与既有产物的内部独立复核，未做外部评分/全面查新，未跑新实验或改实现。工程 A 审计另行收敛。
+
+
+
+
+
+
+▎ 草案把“联合决策优于分阶段流程”和“搜索算法优于同语言 GP”混在了一起。如果用 GP 执行联合搜索，就不能再拿同配置 GP 当被击败的基线。
+
+我的建议是：
+
+1. 主问题先固定为联合决策的价值：用同一个强非 LLM 搜索引擎，比较“结构与定点化共同修改”和“先锁结构、再调字长”。
+2. 只补支撑这项比较的最小闭环：可信整链质量、真实全链面积、公平预算与可追溯结果，不扩平台。
+3. 正式结果支持收益后，再检验 LLM 增量；否则接受负结果，不靠扩任务寻找阳性。
+
+实际证据仍是：E1、存在机制反转、旧池无已证决策损失；开放结构搜索尚未判定。 工程通过不等于 S1，未完成也不等于 S0。
+
+完整建议已保存到：
+- refine-logs/FINAL_PROPOSAL.md
+- 精简认识已追加到 Iknow.md:584
+
+这些是待审建议，不是协议冻结。实现与原暂存区未改；工程 A 审计仍在收敛，未启动仿真、综合或搜索。
+
+✻ Waiting for 4 background agents and 1 dynamic workflow to finish
+
+✻ Waiting for 4 background agents and 1 dy
+
+## 2026-09-30 工程 A 已返回部分：优先最小开发闭环
+
+- IR 身份域确认两个校验缺陷：固定字段/零哨兵接受 bool/int 等类型别名，导致同数值实现出现不同结构 ID；枚举/depth 的 list/dict 输入泄漏 `TypeError` 而非 `IRValidationError`。位置为 `search_ir/validate.py:48-61,98-99` 等；不是 hash 算法错误，也没有已发生搜索缓存污染的证据。限定纯 Python 测试为 20 passed、9 deselected，不能当 RTL/综合复验。
+- 第一版 B 可以更小：固定少量 IR fixture、独立开发 manifest、公共评价适配和校验前记账；先禁用缓存、明确不支持 resume、同 run-id 拒绝重启。无需先实现三套缓存、所有 proposer/action API 或冻结正式预算/seed，避免“等实验校准才能开发评价器”的循环依赖；启用这些能力前再验收。
+- 旧 witness 已有独占 run 目录和 execution→preflight/输入 hash 链；不能说全仓库没有身份保护。新 typed IR 尚未接入，故完整上下文/账本/回显是 missing-gate，而不是现有正式搜索已漏计预算。
+- 旧 helper 的四项条件性缺陷已用临时 fixture/mock 复核：preflight 可覆盖、RTL 报告消费校验不足、baseline 缺 truth→execution 输入绑定、综合 helper 未检查非零退出码。它们只约束未来复用路径；当前历史引用链匹配，不能据此否定既有 witness/面积/E1。B 可新增独立 adapter，避免修改历史证据链上的旧工具。
+- 预算域限定测试为 8 passed（含只读历史报告检查）；与 IR 域测试存在重叠，不累加为统一回归数。本轮没有新仿真、综合、truth 或搜索。其余领域与跨域完整性结论尚未全部汇总，本节不代表整个 A 已完成或 B/C 获准实施。
+
+## 2026-09-30 工程 A 最终汇总完成（不自动进入 B）
+
+- 四域及跨域完整性复核已完成，详见 `refine-logs/STAGE_A_AUDIT.md`。可以据此准备最小 B 代码计划，但 C/R4、正式搜索和 S0/S1 均未获验收；不改历史 witness、原暂存代码或冻结协议。
+- 新增接入边界：IR 类型合法不等于 FIR 满足既有通带/阻带掩码；新旧 `n_sat_fir` 分别按保留抽取输出/全部输入时刻计数，保留输出相同也可能计数不同。必须明确部署可行性与饱和事件统计域，不能接同名字段就声称继承契约。
+- 新评价器应拒绝非有限 q 和不完整场景；旧聚合已由合成数组复现 NaN 的顺序依赖，但没有证据表明历史合法候选已触发。旧模板缓存也有生成/综合依赖失效与可选后端失败固化问题，新管线不宜直接复用。
+- satisfaction 投影需在 selection/archive/历史/特征和 prompt 之前隔离连续质量，不能仅删返回字典中的 q。共同 JSON schema 不保证动作公平；这些在接 proposer 前验收，固定 fixture 的 B 不必先实现全部动作 API。
+- attempt 在 parse 前登记，整次提案只计一次而非各阶段分别扣；缓存计算身份与当前 run/attempt 封装分开，manifest/RTL 摘要避免循环引用。B 可先无缓存、无恢复、无 proposer；未产生的面积明确 unavailable，随后另做真实全链综合计划。
+- 本轮各域限定测试分别为 IR 20 passed/9 deselected、质量 32 passed、预算 8 passed；相互重叠不相加。综合仅临时 mock/摘要检查，没有运行仿真、综合、truth、搜索或 LLM 实验。原暂存区 diff SHA-256 与开始一致。
+
+
+## 2026-09-30 搜索协议独立复核与工程提交边界
+
+- 当前一层 phasor-compose 超越候选编号枚举，但仍是有界语法组合空间；R6 证明构造能力，不证明搜索收益，也不支撑任意递归结构发现主张。
+- satisfaction 是同一数值契约的阈值反馈消融，不等于复现 COEVO test-pass；须冻结反馈为 verdict 向量还是 pass count，并在 selection/archive/history 等决策入口之前隔离连续质量。
+- SEARCH_PROTOCOL §6.2 正式冻结还须指定预算网格、基线前沿合并规则、固定 HV 坐标/归一化/reference point/可行域和 seed 级置信区间。HV 改善不保证各预算无损失，另报预算网格 regret/覆盖；held-out 不用于选点调参。
+- 最小 NCO+FIR 空间足以做受限联合搜索 pilot；联合收益需与 staged、NCO-only、FIR-only 同预算比较，不能把 direct/polyphase 的相同数值输出当作数值多样性。上述要求不放行正式搜索。
+- 本轮仅复跑待提交 DDC/FIR 测试：21 passed；暂存区格式检查通过。没有新场景 truth、真实面积或搜索结果。7 个已暂存文件可作为 WP5 工程检查点申请提交，未暂存研究记录不夹带，commit 仍待用户确认。
+
+## 2026-10-01 阶段 B 最小开发评价闭环（实现与回归）
+
+- 新增 `search_ir/evaluate.py` 与 `dev_run.py`：固定合成输入经同输入参考链/desired-only 分母/前导 LS 对齐得到 `Q_dev`，检查输出 sequence tags、有限质量、完整 case 覆盖及实际 FIR 掩码。该结果不叫 `Q_main`，不判 S0/S1。
+- 修复 IR 固定字段的 bool/float 别名和容器枚举异常；合法结构 hash 不变。原始提案在 parse 前登记一次预算占用；重复与失败都计数。运行目录、候选/结果只写一次；上下文或执行异常封闭运行，不提供缓存、恢复、proposer 或真实综合。
+- manifest 绑定实际输入/reference/desired 数组快照、FCW/测量索引、源码、系数、阈值来源和环境；结果回显身份，缺项/漂移/错误聚合均拒绝。satisfaction 开发接口只暴露 pass count，不代表含 selection/archive 的正式 R5 已通过。
+- mixer 饱和统计含全部接受输入，FIR 统计含实际保留有效输出，均包含前导；FIR 累加/输出事件合计，不冒充旧全输入时刻统计。正式部署可行性保持 pending，mask 失败明确 failed；area 为 unavailable，不复用历史 NCO-only 面积。
+- 最终回归 `python -m pytest -q tests/test_search_ir_*.py tests/test_ddc_metrics.py`：131 passed；包含短合成用例、mock 与已有 RTL 回归，未运行正式场景 truth、真实面积或搜索。`git diff --check` 通过。Black 本地未安装，下载执行被权限策略拒绝，自动格式化未完成。
+- 独立只读复核发现评分接口的整数 dtype 会在能量/相关积处静默溢出（int8 100/101/102 反例）；已在信号入口统一提升为 complex128，码字/tag 保留整数，补 6 种 dtype 对照回归。此前复数 fixture 结果不受影响。复核未发现固定 fixture 主路径阻断问题；B 软件闭环已实现，尚不放行 C/R4 或正式搜索。
+
+## 2026-10-01 阶段 C 固定候选 full-DDC 综合
+
+- 目的仅为建立可信全链成本，不判 S1，不研究迭代 CORDIC/流水/吞吐微结构；有疑问时先回看设计文件的“验证什么、为何验证、采用什么方式”，避免把平台建设代替决定性实验。
+- 公共 `dev_fixtures.py` 复用三份原开发候选，并进入阶段 B/C 源码身份。所有 candidate hash、RTL hash、33 个整数 FIR 系数及 mask 在综合前冻结；Yosys/ABC 均以记录过版本和 SHA-256 的绝对路径调用。单元计数从 JSON top.cells 取得，与 stat/Liberty 交叉核对；面积来自实际库单元面积之和。
+- 初次 `dev-full-ddc-v1-20261001` 的首项在 238.6 秒后因两个 `$scopeinfo` 元数据被严格 mapped check 拒绝，后续未执行。失败现场保留；修订只清理该类来源元数据，其他未映射检查保留。v2 候选与 RTL hash 全部不变。
+- `experiments_search/stage_c/dev-full-ddc-v2-20261001/results.json`：LUT+direct 30454 cells / 38346.294 µm²；CORDIC+polyphase 45094 / 55954.164；compose+polyphase 47141 / 58284.058。第四次重复 LUT 的面积、单元类型/数量、stat 摘要与规范化连接哈希均一致。规范化忽略来源/实例名但保留 Yosys 信号 ID，不是形式等价证明。
+- 以固定 manifest 逐项调度，单项超时上限 600 秒且清理整个任务进程组；已开始、失败或完成的任务均不得重试。一次重复仅为本机可复现性检查，不冻结 epsilon_A。包含旧失败共 5 次真实综合尝试，成功批次为 4 次；没有悄悄抹去失败或缩小候选集。
+- 综合前相关回归 163 passed；未运行主场景质量、held-out 或搜索。独立证据复核仍在进行。下一步针对同三候选验证冻结主场景，仍不能由面积数据单独推断设计收益。
+
+## 2026-10-01 阶段 D 主场景接入与下一项决定性比较
+
+- C 的独立复核已完成：四份产物无 blocker，已记录源码/工具/输入/映射单元/统计/重复摘要全部匹配；不把后加无关文件当历史漂移。
+- `experiments_search/stage_d/fixed-main-v1-20261001/results.json` 完成同三候选 3×36=108 个完整主场景评价。LUT+direct 的 Q=2.0606135458920818e-7；CORDIC+polyphase 为5.632159149410971e-8；compose+polyphase 为2.3350081597469695e-4，约为 q_budget 的10.0245倍。三者观察域饱和均为0；mask/接入通过不等于质量预算合格。
+- compose 超预算是要保留的负例，不修改原fixture救结果；可组合、可综合不自动带来质量或面积收益。本轮不读取held-out，不重综合，不判S/L。相关回归177 passed，覆盖合成/mock和只读面积证据关联；Black仍未运行。
+- 新实验路线图见 `refine-logs/EXPERIMENT_PLAN.md` / `EXPERIMENT_TRACKER.md`。主检验固定同一强非LLM引擎，比较joint与强staged/WLO及cost-first；不能把联合GP击败“同配置GP”当命题。共同动作/饱和门槛/epsilon_A/预算与统计仍待审查冻结，72提案pilot尚未运行。
+
+- 下一轮反方复核指出：共同GP只能直接检验交错/锁图策略；两基线各B次的union实际为2B。已在草案改为两项B对B主比较，union仅辅助；动作继承、两步patch顺序、族锁定/平局、超预算探索资格、失败与统计都写入 `PILOT_RULES_v1.md` 和禁执行的机器清单。accumulator_bits=0为哨兵，不能只靠相邻步跨越无效饱和带，故共同数值动作保留全域跳转。72提案pilot尚未启动，仍须规则复核与实现/校准验收。
+
+## 2026-10-01 对 DDC 整链结果的现实判断
+
+- “使用整条链评价”只是把目标函数放到正确上下文，并不会自动产生更优设计。当前 DDC 的 NCO→CMUL→FIR→R=2 在观察域无饱和，主体近似线性；此前强线性基线③又已完整解释固定池排序，因此强结构—数值耦合的先验概率已经下降。
+- 三个开发点没有形成收益证据：LUT 与 CORDIC 的 Q 分别只有预算的约 0.00885/0.00242，明显过度供给精度；compose 则约为预算的 10.0245 倍且面积最大。当前缺的是贴近质量边界的低成本点，而不是再增加链长度。
+- joint-vs-staged pilot/正式 S 尚未运行，所以现在不能判 S0；但若公平正式比较仍为 S0，应如实接受“该 DDC 契约下误差近似可分、分阶段流程足够”的边界，不通过事后收紧 q_budget、制造饱和或追加任务追逐阳性。第二条链若开展，必须基于预先声明的真实非线性/状态耦合问题，而不是因 DDC 阴性临时换题。
+
+## 2026-10-02 两臂 pilot 实现、校准与一次中止
+
+- 共同动作/选择/驱动已实现：两臂独立PCG64同seed初始化；1/2步patch可重放，结构族在第6次后锁定并保留当前本族最佳，超质量预算个体可探索但不进合格前沿；质量逐次重算，仅缓存成功面积，预算由DevRun的attempt_started统一计数。
+- 首轮补重复 `pilot_calibration/fixed-repeat-v1-20261002` 两项全部一致；工程阈值按事前规则为1%参考面积=383.46294 µm²，不是观测差的概率上界。
+- 独立复核发现初始缓存的工具链身份缺口：历史结果自洽不等于能挂到当前工具hash。`paired-pilot-v1-20261002` 已按SIGTERM停止并保留incomplete（计费8次、7条完成记录、1条在途），没有当作完成pilot或用于S判定。当前工具未变，不能由该条件性缺陷推断既有C面积错误。
+- 修复为：从历史contract计算初始cache key，必须等于当前工具/库/脚本/RTL key才能导入；worker固定cwd=BENCH；生成后立即保存提案并在中止时记录在途状态。补相应回归后完整相关测试232 passed。代码身份改变后使用新run-id补重复，不覆盖原校准/中止记录；pilot-v2尚未启动。
+
+- 修订版补重复v2已通过，缓存/worker局部复核闭合；`paired-pilot-v2-20261002`现已在6小时上限内运行72提案。首个seed的第6次结构锁定及已完成动作回放/预算前缀已核对，没有根据中途胜负调整规则；正式S/L仍为N/A。
+
+## 2026-10-02 04:04 两臂pilot完成与描述性负信号
+
+- v2完整72提案，每seed/arm12；57成功、15非法。72次RNG/状态回放、39次有效变异、2052个质量行、37份实际面积来源核对通过。34次非缓存综合，p90=423.91秒，总墙钟2.121小时；按事前成本规则正式预算取B=32。
+- q_budget内最小面积三seed均staged更低：joint相对改善率−2.740%、−3.545%、−0.742%，均值±样本标准差−2.342%±1.443%。这是12提案/3seed/main-only的描述，不判S0，不声称整个Pareto前沿支配；不会为救阳性改动作/阈值。详见refine-logs/PILOT_ANALYSIS.md。
+- 下一步先补37个实际有效候选的模型—RTL验证，再冻结/执行正式B32必要条件；暂不接LLM或换第二条链。
+
+## 2026-10-02 13:12 正式必要条件运行
+
+- 正式代码与两份协议已在数据前提交834d449；最终284回归，独立复核无blocker。37候选的21种NCO全映射（1376256相位）及192输入的正负饱和/背压验证均通过。
+- 已启动`formal-necessary-v1-20261002`：5个固定seed、joint/staged各32提案共320，最长12小时；完整main后锁集合再held-out。cost-first全部代码/配置已冻结但尚未执行。必要条件失败才按注册规则记操作性S0，不等同普遍无效；当前无S结论。
+
+## 2026-10-02 正式运行中止与主线重新对齐
+
+- `formal-necessary-v1-20261002` 在第 179 个提案发现新 `linear -> quad` 候选的模型—RTL不一致后按协议中止为 `inconclusive`；未读取 held-out，不能记为 S0。根因定位为 quad RTL 舍入表达式的 signedness 污染，负二次项被逻辑右移，最大产生 512 LSB 偏差；旧失败产物保留。
+- 72 提案 pilot 的三个 seed 均由 staged 得到更低的预算内最小面积，是需要正视的描述性负信号，但不是正式结论。更重要的是，joint/staged 只检验搜索调度，不回答项目最初的 LLM 命题。
+- 回看 `thesis/PROPOSAL_v1.md` §4.3 与 `thesis/SEARCH_PROTOCOL_v1.md` §3–4 后，下一工程目标改为 proposer-neutral 的 typed-IR action program：LLM 与强非 LLM proposer 必须共享同一 IR、合法动作、lowering、评价预算和失败计费。公开 action intent 不携带 RNG state、before/after 或 provenance；这些由执行层派生和记录。
+- quad 修复须先完成回归与独立复核，但不自动重跑 320 提案。GP joint/staged 保留为强基线；论文的决定性实验仍是 proposer×feedback 的 2×2，以及可选的诊断反馈消融。只有该统一接口通过验收后才接真实 LLM，避免继续用基础设施或 GP 调度实验替代“借用 LLM 探索能力把数学公式变成硬件”的研究问题。
+- ZCode 分工已校准：00:17 的 `msg_63c0ebaa` 实际落到旧的 `sess_bff62...` 窗口而非用户当前的 `verievolve`；该窗口未产生回复或代码，Codex 已终止仍等待它的持久发送器，避免双臂并发改同一批文件。用户当前 `verievolve` 会话被改派为唯一实现臂，任务仍是先复核 quad signedness，再实现 proposer-neutral 严格 JSON action-program 层；Codex 只做方向与验收。正式 truth、综合、formal rerun、held-out 和协议修改继续冻结。

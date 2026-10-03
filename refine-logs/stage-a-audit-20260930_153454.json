@@ -1,0 +1,504 @@
+{
+  "verified": [
+    {
+      "confirmed": [
+        {
+          "counterevidence": "不是所有类型校验都失效：同文件第40–45行的 _integer 明确拒绝 bool/float，本轮 phase_bits=12.0/true 均被拒绝。构造器会做 int()/bool() 转换，正常构造器调用通常不触发；必须直接检查解析后的 JSON。现有纯 Python 测试全部通过，反例也未产生短样本数值差异，因此不能推导为硬件结果错误或预算已经受影响。",
+          "end_line": 61,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/validate.py:54–61 只比较 width/frac/signed 元组，Python 的数值相等使 12.0==12、1==True。相同模式见第83–86、98–99、153–165、198–217行。本轮独立诊断将原始 JSON 候选的 width/frac 改为浮点整数、signed 改为1、rate.num 改为true、phase.width改为32.0、depth改为256.0、decimation改为2.0、accumulator_bits改为false或0.0、mixer.product_drop改为false：10个变体全部通过 validate_candidate，结构哈希全部改变，但去注释 RTL 和64样本全部模型返回值与基准相同。另验证 polyphase.phases=2.0 同样通过且去注释 RTL 不变。/Users/chengzhy/verievolve/tests/test_search_ir_schema.py:24–98 没有上述原始 JSON 类型负例。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/validate.py",
+          "gate": "B 的局部修复项；C 的严格类型与身份回归前置项。不是正式搜索已发生错误的证据。",
+          "id": "IR-A1",
+          "kind": "actual-defect",
+          "line": 54,
+          "recommendation": "固定格式、rate、phase width、depth、decimation/phases 和零值哨兵统一先检查类型，再比较值；signed 仅接受 bool，整数槽沿用项目 _integer 的规则。补直接解析 JSON 后的负例，避免构造器转换掩盖问题。无需让结构哈希替非法类型做等价归一化。",
+          "scenario": "提议器直接提交可解析的 JSON，把 true/false 写进整数槽或把1写进 signed 标志，校验器错误接受；同一实现获得多个本应被类型门拒绝的结构身份。浮点整数的判定依据是项目当前严格整数规则，不是宣称所有 JSON Schema 都必须拒绝12.0。",
+          "severity": "中（P2）",
+          "title": "固定字段和零值哨兵绕过项目的严格类型规则"
+        },
+        {
+          "counterevidence": "本轮 rounding=null 和无效字符串都正常抛出 IRValidationError，不能泛称所有非法 JSON 类型都会泄漏异常。外层若捕获整个阶段异常并提前登记 attempt，仍能记录失败及计预算；尚未发现使用该异常契约的新 search 调用方，因此不能称为已发生的漏计或搜索崩溃。",
+          "end_line": 51,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/validate.py:48–51 在检查类型前做 set 成员判断，第98行的 depth 也如此。第173–174行声明候选不合法时抛 IRValidationError。本轮直接向完整候选传入 nco.depth=[]/{} 或 filter_decimator.rounding=[]/{}，四例均抛 TypeError: unhashable type，而非 IRValidationError。完整模型与 RTL 入口分别在 /Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py:220 和 /Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_rtl.py:403 调用该校验器，没有在入口转换这类异常。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/validate.py",
+          "gate": "B 的局部修复项；C 前应验证错误类型均成为结构化拒绝，并由公共 attempt 记录机制计一次预算。",
+          "id": "IR-A2",
+          "kind": "actual-defect",
+          "line": 48,
+          "recommendation": "枚举先检查字符串类型，depth 先检查严格整数，再检查允许值；统一通过 _fail 抛带字段路径的 IRValidationError，补 list/dict/null 负例。上层在 validation 之前登记 attempt，不应以捕获某一种异常作为计预算的唯一条件。",
+          "scenario": "数组或对象出现在枚举/整数槽时，文档约定的 schema 拒绝路径变成非约定 TypeError；只捕获 IRValidationError 的调用方会遗漏预期错误处理。",
+          "severity": "中（P2）",
+          "title": "不可哈希字段值泄漏非约定校验异常"
+        },
+        {
+          "counterevidence": "candidate_hash 的结构身份算法没有因此出错，三个版本字段已经参与摘要。检索当前仓库 Python 调用点，只见 search_ir 内部及四个测试模块，没有发现用该函数做持久评价/综合缓存的实际调用方。旧 witness 有独立的系数、协议、源码、工具与 manifest 校验及回显，不能称全仓库没有保护。FCW 是运行时端口，不应强行放进硬件结构哈希或要求每个场景重复综合。",
+          "end_line": 41,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/canonicalize.py:39–41 的注释称其用于评价和综合缓存，实际输入却仅为 IR。/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py:132–136 动态解析外部系数，第216–256行另外接收 FCW，返回结果没有 manifest/context 身份封装；/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_rtl.py:401–455 返回裸 RTL 字符串，其中注释回显结构 hash，但不是 candidate manifest hash。本轮64样本诊断确认 FCW=837518623 与1095216660在同一结构/RTL下输出不同；仅在进程内 mock prototype_taps 后，同一结构 hash 对应不同 hq/RTL 摘要，退出 mock 后恢复。旧 /Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:284–289 仍调用固定参数字典的 fixed_chain.run_candidate，不接完整 typed IR。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/canonicalize.py",
+          "gate": "missing-gate：B 应确认并实现 typed-IR 评价/综合接入的完整身份边界；C 前完成上下文失配拒绝、缓存隔离与 manifest hash 回显测试。此项不是已发生缓存污染。",
+          "id": "IR-G1",
+          "kind": "missing-gate",
+          "line": 39,
+          "recommendation": "保留结构哈希并澄清注释，在新 adapter/manifest 中绑定实际 lowering 及解析常数、评价场景/输入/FCW、实际 RTL/top/综合契约，并让结果关联原始 candidate_manifest_hash。implementation/evaluation/synthesis 三层 key 是推荐组织方式，不是唯一正确实现：完整复合 key，或经过校验的不可变 run 命名空间加局部 key，同样可满足要求。",
+          "scenario": "未来接入新搜索时，若直接把 candidate_hash 当跨上下文持久缓存的全部身份，不同场景或 lowering/系数依赖会共享键而对应不同结果。当前可确认的是接入 gate 尚未落地，不是正式实验已经误用缓存。",
+          "severity": "C／正式搜索准入阻断项（非现有结果错误）",
+          "title": "新 typed IR 的结构身份尚未接入完整评价与综合身份封装"
+        }
+      ],
+      "domain": "ir-identity：typed IR 类型、结构身份、lowering 上下文及接入边界的独立复核",
+      "established_invariants": [
+        "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/canonicalize.py:14–41 对映射键排序、保留序列顺序、排除 metadata，并计算完整 SHA-256；它不自动校验候选，也不证明数值或硬件等价。本轮确认 metadata/映射顺序不改变 hash，schema_version/formula_version/contract_version 改变均改变 hash，且 validator 拒绝不支持的版本。",
+        "当前候选是受限类型树，不是任意 DAG。/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/validate.py:89–131 限定一层 phasor_compose；本轮节点 id/metadata 负例均被拒绝。因此不能把当前规范化能力描述为任意节点重命名或精确重写的规范化。",
+        "可复用入口是 /Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py:216–256 的 emulate_ddc_candidate(candidate, i12, q12, fcw) 和 /Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_rtl.py:401–455 的 lower_ddc_rtl(candidate)。模型接收 signed Q1.11 整数码并返回整数输出/索引/中间量，不直接返回链级 q 或面积；RTL top 固定为 top，FCW 是32位输入端口，没有外部系数、初态或 rate 覆盖参数。",
+        "实现当前固定的状态与数值语义包括：相位初态0，accept时递增并使用递增前相位；FIR状态清零，当前33抽头下首输出对应输入索引32、之后步长2；同步低有效 reset；混频 half-up 右移11位并饱和为 signed-16。位置为 /Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py:139–150、183–256 和 /Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_rtl.py:210–229、310–345、374–394、420–451。这是实现现状，不等于正式搜索协议已冻结。",
+        "系数不是仅由 coefficients_id 字符串决定：/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py:132–136 调用 /Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/ref_chain.py:19–25 的 SciPy firwin，再经 /Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/fixed_chain.py:118–123 量化。固定字符串、实际依赖快照与解析后的 hq 必须区分。",
+        "direct-symmetric 与 polyphase 确有不同运算/状态路径，而非改标签：/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py:153–180 与 /Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_rtl.py:168–348。/Users/chengzhy/verievolve/tests/test_search_ir_fir.py:23–73 同时测试无 product_drop 时相等和有 product_drop 时可不同，本轮这些测试通过。",
+        "旧 witness 的身份保护真实存在，但作用域不同：/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/prepare_witness_v1.py:30–36 明确引用 WITNESS_FROZEN_DDC_v1 而非搜索草案，第171–175、215–229行记录系数、源码/环境与场景；/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:263–275 校验旧 manifest/hash，第459–475行核对固定下游/候选池并记录 execution hash，第485–487行拒绝重复 run 目录。这里只读了这些路径，没有运行或复验历史产物。",
+        "本轮限定测试为20 passed、9 deselected（0.44s）。/Users/chengzhy/verievolve/tests/test_search_ir_ddc.py:46–250 中存在两个候选的连续流、输出背压和 Yosys 结构测试，但本轮未执行这些外部工具测试；它们不能被计作当前 RTL 或面积验收。"
+      ],
+      "gate_assessment": "从本域看，可以进入 B 的接入设计与局部修复准备，但不构成写入仓库或运行实验的授权。进入 B 前应由主会话明确 B/C 定义、候选 manifest 与执行上下文的身份边界，并确认以下字段及验收计划；保留已有暂存变更，不改阈值或候选池。C 前至少完成两项校验缺陷的回归、同候选跨场景/FCW及依赖漂移的缓存隔离、解析上下文失配拒绝、candidate_manifest_hash 跨阶段回显，并联合 runner 域验证 schema/type/lowering/sim/synth 失败各计一次 attempt、重复提案计预算及 run 不可覆盖。正式搜索仍不能放行：/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:4 明示草案未冻结，第205–213行的表示 gate 及后续正式运行条件未由本审计证明满足。不得据基础设施缺口判 S0。",
+      "limitations": [
+        "本轮仅执行只读 Python/内存 RTL 文本诊断和已排除外部工具的测试；没有执行 iverilog、vvp、Yosys、服务、LLM、正式搜索、77场景 truth 或 witness。诊断差异不能当作质量、面积或研究结果。",
+        "Python 3.10.8、NumPy 2.2.6、SciPy 1.15.3 环境中的64样本比较，只说明所列反例的当前行为。进程内 prototype_taps mock 仅用于证明身份边界，未修改文件，也不代表真实依赖漂移或缓存误命中曾发生。",
+        "为寻找反证，额外阅读了旧 witness 的 manifest/固定池调用与 run 保护路径及对应测试；未运行这些测试，因为其中 build_preflight_manifest 会访问历史报告并调用工具版本查询。未审查所有 runner 的失败账本或综合缓存实现，跨域条件须合并其他直接证据。",
+        "开始和结束时均观察到七项暂存变更，/Users/chengzhy/verievolve/Iknow.md 同时有未暂存变更，/Users/chengzhy/verievolve/MANIFEST.md 与 /Users/chengzhy/verievolve/refine-logs/ 已处于未跟踪状态。本子任务没有写任何仓库文件或执行 git add/commit/push，也没有读取或操作未跟踪产物；不能据状态列表证明没有其他会话并发修改。",
+        "/Users/chengzhy/verievolve/Iknow.md 的记录留给主会话统一处理，本子任务未追加。"
+      ],
+      "rejected_or_narrowed": [
+        "将 IR-G1 从可能被误读为现有缓存 bug，明确缩小为新 typed-IR 接入的 missing-gate。当前 candidate_hash 的实际使用是内部命名、RTL注释和测试，未发现持久评价缓存调用方。",
+        "否定“结构 hash 应直接包含 FCW、源码和所有评价参数”的要求。FCW 属于评价上下文；可编程 FCW 的同一 RTL 可复用综合。若 wrapper 固定或特化 FCW，则 wrapper及其参数才应进入综合身份。",
+        "三层独立缓存 key、逐文件摘要布局与环境标识的具体形式归为 recommendation；真正门槛是有效 key/不可变作用域覆盖会影响对应结果的内容，并能验证及追溯，不要求唯一架构。",
+        "不能说旧 witness 没有哈希回显或 run 防覆盖；实际代码已有这些保护。但其26点NCO/固定下游契约与新联合 FIR 搜索不同，不能将旧保护和历史报告直接当作新 search 的验收。",
+        "/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:4 与 /Users/chengzhy/verievolve/thesis/CONTRACT_DDC_v1.md:4 都自称未冻结草案。旧 witness 则另引用 /Users/chengzhy/verievolve/thesis/WITNESS_FROZEN_DDC_v1.md；不能把两个草案说成已经冻结，也不能反向推断旧 witness 没有独立冻结协议。",
+        "IR-A1 未证明硬件数值错误；IR-A2 未证明失败漏计。两者分别限于类型门不一致及异常契约泄漏。null枚举值已有正确拒绝，不属于泄漏反例。",
+        "不沿用初审“工作区没有 tracked 未暂存修改”的旧观察；本轮从开始即存在 /Users/chengzhy/verievolve/Iknow.md 未暂存变更。"
+      ],
+      "required_fields": [
+        "候选与提案身份：manifest_schema_version、proposal_id/attempt_index、原始 proposal 或不可变引用及摘要；合法候选另保存完整 validated canonical_ir、candidate_structural_hash、schema_version/formula_version/contract_version。非法提案也须可登记，不依赖先得到合法 IR hash。metadata/显示标签与结构身份分开。",
+        "协议内容身份：实际使用的搜索/评价契约文件及内容摘要、冻结状态和范围。不得仅记录字符串 CONTRACT_DDC_v1，也不得因旧 NCO-only witness 已冻结而自动放行联合 FIR 契约。",
+        "lowering 身份：实际执行源码快照或内容摘要、加载路径、Python/NumPy/SciPy及可核验环境。至少覆盖 /Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/ 的校验/规范化/lowering，以及实际调用的 /Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/ 下 ref_chain.py、fixed_chain.py、rtl_gen.py、spec.py 和 /Users/chengzhy/verievolve/examples/comm_dsp_bench/certfit/tpl_cordic.py。当前有暂存变更，git HEAD 单独不足以固定实际代码。",
+        "解析常数：coefficients_id、原型 taps 的确定表示/摘要、实际整数 hq 或不可变内容引用、长度/dtype/字节序、系数字长/量化规则；NCO表及CORDIC常数由实际依赖与生成 RTL 摘要固定。执行时核验解析值与 manifest 声明一致。",
+        "状态/接口契约：phase宽度32、初态0、accept更新顺序；FIR初态、tap_count=33、R=2、phase-0与first_output_input_index=32；reset/valid-ready语义、half-up/trunc和饱和规则、accumulator_bits=0的解释。可固化为公共 lowering context，不必增加候选搜索自由度。",
+        "评价上下文：scenario_manifest_hash、contract内容摘要、split/完整场景键、seed、实际整数FCW及静态配置规则、共享ADC整数输入的内容摘要/格式、输出Q1.15缩放、sequence mapping、前导/测量段、参考与指标实现身份。适配器不能直接将浮点波形传给当前整数模型。",
+        "硬件/综合身份：generated_rtl_sha256、top=top、FCW运行时或特化模式、wrapper及完整源集合摘要、工具版本、liberty/脚本/约束摘要。结构 hash 不能代替实际 RTL 与工具契约；12字符内部模块名前缀不能代替持久身份。",
+        "关联与缓存契约：candidate_manifest_hash 的确定序列化范围（不包含自身字段）、上下文引用及摘要、各阶段结果中可核验的回显；完整 composite key 或经过校验的分层 key/不可变命名空间、缓存失配拒绝策略。须测试结构相同而上下文不同，以及内容变化但版本字符串不变的情况。",
+        "与 runner 域联合确认：不可覆盖 run_id/output路径、阶段状态/失败原因、重复及非法提案计预算规则、schema/type/lowering/sim/synth失败各计一次attempt；重试与恢复不能让同一attempt重复计数或静默丢失。以上为待落地/验收字段，不是本域已验证的运行保证。"
+      ],
+      "summary": "独立复核保留两项可复现校验缺陷，以及一项经缩小的 typed-IR 身份接入 missing-gate。限定纯 Python 测试本轮20项通过；没有复验 RTL、面积或正式场景。现有结构哈希与旧 witness 保护不应被否定，但后者不能外推到新搜索。可进入 B 的实现准备，尚不能签署 C 或正式搜索就绪；不判 S0，不修改文件。",
+      "verification_commands": [
+        "PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q -p no:cacheprovider /Users/chengzhy/verievolve/tests/test_search_ir_schema.py /Users/chengzhy/verievolve/tests/test_search_ir_lowering.py /Users/chengzhy/verievolve/tests/test_search_ir_fir.py -k 'not composition_rtl and not fir_streaming_rtl'",
+        "rg -n 'candidate_hash|canonical_json|validate_candidate|candidate_manifest|semantic_hash|lower_ddc_rtl|emulate_ddc_candidate' /Users/chengzhy/verievolve/examples /Users/chengzhy/verievolve/tests /Users/chengzhy/verievolve/openevolve /Users/chengzhy/verievolve/scripts -g '*.py' -g '!experiments*/**'",
+        "rg -n 'search_ir|candidate_manifest|semantic_hash|implementation_key|evaluation_key|synthesis_key' /Users/chengzhy/verievolve --glob '*.py' --glob '!refine-logs/**' --glob '!**/experiments_*/**'",
+        "git -C /Users/chengzhy/verievolve status --short && git -C /Users/chengzhy/verievolve diff --name-only && git -C /Users/chengzhy/verievolve diff --cached --name-only"
+      ]
+    },
+    {
+      "confirmed": [
+        {
+          "counterevidence": "旧入口是有意限定的 witness runner，不是宣称支持开放 IR 后又算错。它重建并核对冻结的 26 点 NCO 池与固定 FIR/CMUL；新整数接口已能接受完整 IR，并检查候选、输入形状/范围与 FCW。/Users/chengzhy/verievolve/tests/test_search_ir_ddc.py:46-122,125-230 已有完整链模型—RTL及背压测试，但本轮未运行这些 RTL 测试。",
+          "end_line": 294,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:284-294 直接调用 fixed_chain.run_candidate；453-468 明确重建固定下游和旧 NCO 池。/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py:216-256 虽提供 emulate_ddc_candidate，却没有 candidate manifest、场景或质量记录入口。本轮全库 Python 调用检索中，该接口仅见于定义、导出及测试，未见场景 evaluator 调用。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py",
+          "gate": "B 的接入工作，不是进入 B 前必须已经实现的条件；完成并验证前不能进入 C 的 IR 场景验收或正式搜索。",
+          "id": "EVAL-01",
+          "kind": "missing-gate",
+          "line": 284,
+          "recommendation": "保留旧 witness 的限定和防漂移保护，新增独立 adapter。校验 candidate manifest 后，用同一 sd.x_adc 转成 Q1.11 整数，调用 emulate_ddc_candidate，按 2^15 还原输出；核对 output_indices 与 reference 标签，构造共同 P/M，显式传入共同缩放的 desired-only reference 分母。先用合成数组、mock 场景和失败注入验收，不隐式生成或评价冻结场景。",
+          "scenario": "希望经现有 truth CLI 评价 phasor-compose 或新 FIR IR 时，没有读取该 IR 的入口；现有流程只会运行其明确声明的旧池，不能被当作新 IR evaluator。",
+          "severity": "high",
+          "title": "完整 IR 模型尚未接入 candidate-manifest 场景评价边界"
+        },
+        {
+          "counterevidence": "当前合法整数模型具有范围检查和饱和，未找到合法 IR 在常规冻结输入下自然产生 NaN 的路径；本轮也没有读取或复跑真实 witness 来证明其已受影响。现有指标已拒绝长度错误、空 P/M、非正参考能量及零复增益。NaN 若位于首行会传播 NaN，不是所有位置都会得到有限 Q。",
+          "end_line": 327,
+          "evidence": "本轮最小复现使用 4 点复数参考全 1、n_pre_out=2，仅将候选末点设为 NaN。/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/metrics.py:257-276 返回 err_aligned=NaN。将此行分别插入两个有限 q=1e-6、2e-6 场景的首/中/尾，当前 _aggregate 的结果依次为 NaN、2e-6、2e-6，三次 n_scenarios 均为 3。原因是此处直接使用 Python max，且指标边界只比较 <=0，没有有限性检查。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py",
+          "gate": "B 复用公共指标/聚合器前应修复的异常边界；不能据此判定旧实验失效或 S0。",
+          "id": "EVAL-02",
+          "kind": "actual-defect",
+          "line": 321,
+          "recommendation": "在评价边界检查数值输入、g、分母及线性 q 的有限性；聚合前拒绝无效行，避免以有效子集代替完整场景集合。异常记录为失败并计尝试预算，测试 NaN 首/中/尾及 Inf。不要笼统拒绝所有非有限展示字段：q=0 对应 dB=-inf 是现有零误差语义，应保留。缺失/重复场景检查属于新 adapter 的完整性门，而非本次 NaN 复现已经证明的另一缺陷。",
+          "scenario": "调用者或未来 adapter 将非有限数值送入指标后，NaN 场景位于有限场景之后，聚合会返回有限 Q，同时将该无效场景计入 n_scenarios，形成顺序相关的异常接受。",
+          "severity": "medium",
+          "title": "NaN 场景可被 max 聚合忽略，且结果依赖行顺序"
+        },
+        {
+          "counterevidence": "validate_candidate 的职责是结构、类型、rate 和参数范围，不应等同于全部部署可行性；允许 8 位候选本身不是 bug。旧流程并非只有标记而无拒绝：/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/prepare_witness_v1.py:157-165 会拒绝 full['illegal']，runner 再对整个 preflight 和固定 FIR 做一致性校验。当前尚无新 IR 正式评价器将这些候选误放行。",
+          "end_line": 170,
+          "evidence": "当前 /Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/validate.py:159-170 允许 coefficient_bits=8..24；/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py:132-136 只解析和量化系数。本轮对两种 FIR 的 wc=8/rne 检查均通过类型校验，却在 /Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/candidates.py:109-136 的既有掩码中返回 legal=false，pb_ripple_db=0.6253、sb_worst_db=-26.7158；wc=16/rne 则通过。此诊断只检查系数频响。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/validate.py",
+          "gate": "B 需区分类型合法与部署可行；C/正式搜索前应明确继承规则并完成执行与回显。",
+          "id": "EVAL-03",
+          "kind": "missing-gate",
+          "line": 159,
+          "recommendation": "在独立可行性阶段对实际解析的 hq 执行既有掩码检查，记录规则版本、阈值引用与结果；不要把它塞成 schema 最低字长限制，也不要缩小候选池来绕过。若不继承硬掩码，必须先作为显式契约变更审议，不能借 adapter 接入静默改变。",
+          "scenario": "未来接入若把 validate_candidate 成功直接解释为满足部署约束，8 位 FIR 将跳过旧链已经执行的通带/阻带可行性检查。",
+          "severity": "medium",
+          "title": "新 IR 的类型校验尚未连接部署 FIR 掩码"
+        },
+        {
+          "counterevidence": "新模型只计算有效抽取输出，有实现上的合理性；/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_rtl.py:387-393 也只在有效偶数标签锁存输出。本轮诊断中保留输出逐位相同，计数差异不证明 FIR 数值错误、RTL 不一致或质量退化。不能要求为了与旧计数相同而计算本来不会输出的样点。",
+          "end_line": 211,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py:199-211 仅对从 32 开始的保留标签计算 n_sat；/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/fixed_chain.py:149-168 在所有输入时刻计累加器和输出饱和。本轮 34 点脉冲复现中，wc=16/wacc=20、脉冲位于 index=0 时两种新结构与旧计数均为 0 对 29；wc=24/wacc=20、脉冲位于 index=33 时为 0 对 1。两种用例的保留输出均逐位相同。旧 runner 在 /Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:496-498 对 main/heldout 任意非零计数拒绝。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py",
+          "gate": "B 可先实现分域诊断；C 前必须决策并版本化硬 gate 的统计域，不能把同名字段直接视为契约等价。",
+          "id": "EVAL-04",
+          "kind": "missing-gate",
+          "line": 199,
+          "recommendation": "明确量化点、计数事件和统计域：预热、接受输入、有效抽取输出、测量段，以及 accumulator/output 是否分别计数。区分影响硬可行性的计数和只用于诊断的计数；由主会话审议与旧规则的关系，不预设应扩大或缩小统计域，不改变已有阈值。",
+          "scenario": "B 若直接把新 n_sat_fir 接到旧非零即拒绝断言，并声称完全继承旧饱和口径，会把全步计数静默替换为保留输出计数。",
+          "severity": "medium",
+          "title": "新旧饱和计数域不同，硬可行性口径仍待明确"
+        },
+        {
+          "counterevidence": "旧 witness 的 main→heldout→stress 顺序隔离已经实现，且 main checkpoint 与 main_decision 在 heldout 前落盘。当前没有运行中的两臂 IR 搜索，因此没有可证实的 satisfaction 泄漏、heldout 回流或免费失败预算；这些是拟建搜索入口缺少的机制。",
+          "end_line": 315,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:298-315 返回连续 q、g、功率及场景诊断，318-328 返回 Q/argmax。当前 /Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/ 只有 schema、validate、canonicalize、lowerers 和导出；本轮全库 Python 检索未见与新 IR 连接的 satisfaction 投影或 attempt ledger。要求目前写在 /Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:121-122,135-144,164-174，而非可执行的新搜索路径。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py",
+          "gate": "B 应建立记录与反馈/预算边界；R5 和正式搜索准入前必须有隔离与失败注入测试。不能把缺少这些规划功能称为现有搜索已经不公平。",
+          "id": "EVAL-05",
+          "kind": "missing-gate",
+          "line": 298,
+          "recommendation": "同一底层评价记录分别投影 numerical 与 satisfaction；后者只暴露冻结 verdict/pass count 和共同允许的成本/硬失败信息，不返回 q、margin、argmax、g 或完整日志。训练入口仅授权 main；heldout 依赖候选/选择状态冻结，stress 不反馈。解析前创建 attempt，schema/type/lowering/sim/synth 失败、重复及 cache-hit 均恰计一次，并保存失败阶段与终态。",
+          "scenario": "未来若直接将旧丰富结果字典交给两个 fitness 臂，Boolean 臂就能读取连续误差；若仅成功评价后计数，则前置失败和重复可能成为免费尝试。当前尚无该错误连接。",
+          "severity": "high",
+          "title": "新搜索尚缺反馈投影、split 入口与全阶段尝试台账"
+        },
+        {
+          "counterevidence": "candidate_hash 作为 IR 身份本身没有被证明错误；排序稳定和 metadata 排除测试本轮通过。/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_rtl.py:361,406 已在 RTL 注释中回显结构 hash，不能说完全没有回显。旧 witness 也有完整 preflight 校验、新 run_id 目录互斥创建及最终结果 manifest hash。当前没有新缓存可被证明已经误命中。",
+          "end_line": 136,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/canonicalize.py:28-41 只哈希语义 JSON；/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py:132-136 动态调用 prototype_taps 和旧量化器，216-256 不绑定外部评价契约。当前没有新 IR 的质量/综合缓存或 search/evaluation manifest 入口。旧保护的实际位置为 /Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:65-76,264-276,470-487,511-515，不能直接外推成新搜索已经具备同样保护。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py",
+          "gate": "B 需定义并实现运行契约/结果封装；C 和正式搜索前验证漂移拒绝、缓存键、run 重名拒绝与 manifest hash 回显。",
+          "id": "EVAL-07",
+          "kind": "missing-gate",
+          "line": 132,
+          "recommendation": "保留 candidate_hash 表示 IR 身份，另外建立 evaluation/lowering/synthesis contract hashes。在 adapter 或结果 envelope 记录 resolved 系数、代码/环境、场景/测量契约与完整 manifest hash，分别构成质量和综合缓存键；不必强迫纯整数函数承担全部日志职责。复用新建 run 目录拒绝覆盖的策略，但签发独立 search manifest，不重签或覆盖旧 witness。",
+          "scenario": "未来若仅以 candidate_hash 命中缓存，在 JSON 不变而实际系数、依赖、lowering 或测量契约改变时可能复用旧评价。这是必须防止的未来错误，不是本轮发现的既有缓存污染。",
+          "severity": "high",
+          "title": "IR 身份尚未绑定新搜索运行契约、缓存及结果封装"
+        }
+      ],
+      "domain": "quality-adapter：DDC typed IR 场景评价、质量契约与反馈公平性的阶段 A 独立复核",
+      "established_invariants": [
+        "本轮独立运行 32 个纯函数、场景元数据及非 RTL 单测，32 passed、6 deselected；不是引用初审或历史测试结果。另运行了内存中的有界合成诊断，没有生成冻结场景。",
+        "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/metrics.py:241-288 当前确实只在 P 上相对完整 reference 拟合一次复增益，再在不重叠的 M 上计算误差；显式 y_des_ref 决定 desired-only 分母。零误差 g=1、已知复增益恢复、分母测试本轮通过。q=0 的 dB=-inf 属于正常展示语义。",
+        "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:284-294 现有调用显式传入 desired-only 分母，318-328 在线性 q 上取 max 并回显 argmax；不是 dB 均值聚合。",
+        "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/scenarios.py:149-185 将 witness AWGN 校准到 desired-only、加 blocker 前的冻结 reference 输出测量域 SNR；共同缩放后暴露各分量。这一实现本轮只审阅，未重新生成波形验证 SNR，不可改成按候选 FIR 校准。",
+        "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/spec.py:157-196 的主/heldout/stress 数量、唯一键和稳定 seed 元数据测试本轮通过；/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:489-509 保持旧 main 决策先落盘再访问 heldout/stress 的顺序。",
+        "本轮解析的 reference 与 ddc-v1-h33 均为 33 taps；wc=16/rne 的 IR hq 与旧量化器逐项相同，little-endian int64 SHA-256=c1a68a31c23357970618082b1da6743e67e091c09d562aa617819542c824daf1。来源逻辑为 /Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py:120-136 与 /Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/ref_chain.py:19-25，未发现当前系数族静默漂移。",
+        "本轮长度诊断中输入 32/33/34/35/97/13312 时，IR 与 reference 输出长度同为 0/1/1/2/33/6640；默认标签为 32,34,...，按输入标签 512 划分得到 240 个前导输出和 6400 个测量输出。依据 /Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py:199-211 与 /Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/ref_chain.py:44-67；这只是合成零输入的标签/长度检查。",
+        "本轮额外用 seed=761 的 97 点合成 Q1.11 输入、LUT256-linear/phase_bits=12、两种 wc=16 无丢位 FIR，核对完整 IR 输出与旧固定链保留输出，实部、虚部和标签均逐位相同。这不代表全链场景质量已验收。product_drop>0 的 direct 预加乘积量化与 polyphase 逐 tap 量化则是显式不同语义，不能要求恒等，见 /Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py:153-180。",
+        "/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:1-11 明确仍是未冻结草案；/Users/chengzhy/verievolve/thesis/CONTRACT_DDC_v1.md:1-8 也仍是草案，而 /Users/chengzhy/verievolve/thesis/WITNESS_FROZEN_DDC_v1.md:1-8 是旧 NCO-only 冻结对象。IR 中 CONTRACT_DDC_v1 字符串不能代替实际契约来源及冻结状态。"
+      ],
+      "gate_assessment": "本领域结论为有条件进入 B 的接入设计与受控实现，不是放行 C 或正式搜索，也不判 S0/S1。进入 B 前，应由主会话确认开发准入和最小范围，明确沿用的质量/场景/系数/标签边界、独立 manifest 方案及仍待决策的饱和统计口径；SEARCH_PROTOCOL 草案不能当作 R0 已冻结的授权。B 的目标是补齐本报告中的 adapter、fail-closed 数值/完整性检查、可行性记录、反馈投影、尝试台账和运行封装，以合成输入与失败注入验收，不要求这些尚未实现的 gate 反过来成为开始 B 的前置条件。进入 C 前须通过相应测试、明确所有契约待定项，并由主会话另行放行冻结场景与全链综合验收。正式搜索还需完成协议冻结、R4/R5 等表示与公平性门及正式 search manifest。若 B 采用完整 IR bit-true 评价，扩展旧线性代理不是必要条件。",
+      "limitations": [
+        "本轮未运行 RTL 仿真、任何综合、冻结场景 truth、witness 或线性基线；没有新候选 Q、满足场景数、面积或 E1 扩展结论。已有 RTL 测试的存在不等于本轮复验通过，Yosys 结构检查也不是 mapped area。",
+        "没有证据表明 NaN 缺陷已影响现有 witness；已验证的是公共指标/聚合函数在异常输入下的行为，没有构造出合法 IR 常规输入自然产生 NaN 的完整链路。",
+        "饱和统计域如何转化为 direct/polyphase 可比的硬可行性，需要主会话作契约决策，本审计不代为扩大/缩小统计范围，也不改阈值或候选池。",
+        "缓存闭包、并发落盘、全 RTL 输入域和所有微结构不在本子任务完整验证范围内；absence 结论限于实际检索到的新 IR 调用路径。",
+        "全程没有写改仓库文件，包括 /Users/chengzhy/verievolve/Iknow.md；已请主会话统一追加简要结论。未执行 git add/commit/push。检查前后均可见七项原有暂存变更，以及既有 Iknow.md 未暂存变化、MANIFEST.md 和 refine-logs/ 未跟踪项；本子任务未创建、修改或读取后二者内容。"
+      ],
+      "rejected_or_narrowed": [
+        "EVAL-06 从独立 missing-gate 降为条件性 recommendation。/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_linear_baseline_v1.py:46-58,194-202 确实只评价旧 NCO 与固定 h_linear；但 /Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:160-162 已明确要求新 FIR 代理重过 Gate A/B，且允许正式终考使用 full-chain bit-true。未发现错误外推的执行路径。B 若直接用完整整数模型，不应被迫扩展代理；只有选择代理路线时才新增准入验证。",
+        "EVAL-02 保留为中等异常处理缺陷，但收窄为后出现 NaN 的顺序相关聚合问题，不宣称现有合法 IR、冻结 witness 或正式搜索已经产生乐观错误结果。NaN 首行会传播，不能描述成无条件忽略。",
+        "EVAL-03 不把 8 位 schema 合法当成 bug；schema 与部署可行性本应分层。掩码失败是系数频响诊断，不是场景质量失败。旧 preflight 对 illegal 的拒绝是真实保护，不能遗漏。",
+        "EVAL-04 不把新计数低于旧计数当成 RTL 缺陷或无饱和证明，也不预设新模型必须模拟弃样时刻。仅保留接入时不得用同名字段掩盖统计域改变的契约门。",
+        "EVAL-07 不要求 candidate_hash 自身包含所有外部环境，也不要求纯整数函数自己持久化 manifest。稳定 IR 身份已经实现，RTL 注释已有 hash 回显；缺的是新评价/缓存/结果 envelope 的契约绑定。没有既有新缓存误命中的证据。",
+        "否定默认 FIR 长度/设计已静默变化、测试显式 12 位等于隐式降低默认精度、旧 runner 没有 split 隔离或不可覆盖机制等扩大表述。当前系数、默认标签与输出长度诊断支持相反结论。"
+      ],
+      "required_fields": [
+        "契约身份：原始提案或其 hash、完整规范 IR、schema_version/formula_version/逻辑 contract_version/candidate_hash；实际质量与场景契约的来源文件、版本、冻结状态及 SHA-256。区分 /Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md 草案和沿用的 /Users/chengzhy/verievolve/thesis/WITNESS_FROZEN_DDC_v1.md 字段。",
+        "系数和定点语义：coefficients_id、实际 taps、prototype 设计/归一化参数及 float 系数 hash、候选 hq/hash、字节序/dtype、wc 与 frac、quantizer 版本、rne=half-up、direct 预加与 polyphase 逐 tap 的量化位置。",
+        "lowering 契约：bit-true/RTL 及依赖代码指纹、NumPy/SciPy 版本；Q1.11 输入、Q1.15 NCO/mixer/FIR、MIX_FRAC_SHIFT=11、初相/reset、按接受输入更新相位、R=2/phase=0、valid/ready 行为；综合时明确 FCW 为可编程端口，不能偷偷常量特化。",
+        "场景和激励：split 授权、scenario_version、完整 key/seed、f_off、整数 FCW/gcd/period、N_SYM/N_WARMUP_SYM、QPSK/RRC、blocker 参数、desired-only reference 输出域 SNR、共同缩放与 ADC 量化；共享 x_adc 和分量的可复现 hash 或不可覆盖引用。",
+        "对齐和完整性：输入长度、output_indices/reference 标签映射、P/M 标签边界、共同尾部交集、实际前导/测量样本数、预期 main 场景集合及缺失/重复检查。不能只存数组长度或硬编码 240。",
+        "内部质量记录：线性 q_raw/q_aligned、g_re/g_im、desired-only 分母、q_cal/q_budget/epsilon_Q、Q/argmax 与完整性状态；dB 只展示，q=0 的 -inf 不应被误当成数值失败。",
+        "可行性：实际 hq 的 mask 结果和规则 hash；mix/FIR 饱和的量化点、统计域、累加器/输出事件定义、预热/弃样/测量段处置及各 split 的 gate；需要旧诊断时回显 mix_preclip_peak_ratio 或等价原始量，不能假定当前 emulate_ddc_candidate 已返回 mix_re_pre/mix_im_pre。",
+        "反馈公平性：同一内部记录的 numerical/satisfaction 白名单版本，satisfaction=Σ1[q<=q_budget] 的边界规则，共同成本/硬失败信息、archive/selection/cache 规则；不向 satisfaction 暴露连续 q、margin、argmax、g、谱或完整日志。",
+        "预算生命周期：parse 前建立 attempt_id、proposer/fitness、扣减计数、schema/type/lowering/sim/synth 失败阶段和原因、重复/cache_hit、最终状态；每次提案恰计一次，缓存只节省成本，不返还尝试。",
+        "分层缓存与运行溯源：质量键绑定 candidate_hash、resolved 系数、bit-true/evaluator 指纹、激励/场景/测量/校准契约；综合键绑定 candidate_hash、hq、RTL/lowering、top/FCW 模式、工具/库/脚本 hash。不可覆盖 run_id；结果/检查点 envelope 回显 search/candidate/evaluation manifest SHA-256；面积另记 mapped scope、工具/Liberty/脚本、returncode、状态和日志 hash。"
+      ],
+      "summary": "独立复核保留 6 项：1 个有界可复现的 actual-defect（NaN 聚合顺序依赖）和 5 个尚未落地的 missing-gate。原 EVAL-06 收窄为选择线性代理路线时才适用的 recommendation，不阻塞直接使用完整 bit-true 的 B。当前没有证据表明旧 witness 已算错、新 IR 已发生正式反馈泄漏或缓存污染；默认 33-tap 系数、标签和有限合成输入的旧链对应关系得到本轮检查支持。32 个单测当前通过，但不能替代场景质量、面积或正式搜索准入。可据此进入经主会话确认的 B 最小接入工作；目前不能进入 C 或正式搜索，不判 S0/S1。",
+      "verification_commands": [
+        "PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -B -m pytest -q -p no:cacheprovider /Users/chengzhy/verievolve/tests/test_ddc_metrics.py /Users/chengzhy/verievolve/tests/test_ddc_witness_preflight.py::test_q_aggregation_uses_linear_max_and_reports_argmax /Users/chengzhy/verievolve/tests/test_ddc_witness_preflight.py::test_preflight_q_calibration_and_threshold_are_exactly_defined /Users/chengzhy/verievolve/tests/test_ddc_scenarios.py::test_witness_scenario_counts_and_unique_keys /Users/chengzhy/verievolve/tests/test_ddc_scenarios.py::test_seed_depends_on_full_key_not_list_position /Users/chengzhy/verievolve/tests/test_ddc_scenarios.py::test_manifest_fcw_fields /Users/chengzhy/verievolve/tests/test_search_ir_fir.py /Users/chengzhy/verievolve/tests/test_search_ir_schema.py -k 'not rtl'",
+        "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/chengzhy/verievolve/examples/comm_dsp_bench python3 -B - <<'PY'\nimport math\nimport numpy as np\nfrom chains.ddc.metrics import aligned_impl_error\nfrom chains.ddc.run_witness_v1 import _aggregate\ny = np.ones(4, dtype=complex)\nz = y.copy()\nz[-1] = np.nan\nq = aligned_impl_error(y, z, 2, y_des_ref=y)['err_aligned']\nassert math.isnan(q)\nfor pos in range(3):\n    values = [1e-6, 2e-6]\n    values.insert(pos, q)\n    rows = [dict(candidate='a', split='main', scenario=str(i), fcw=1, q_aligned=v, q_aligned_db=10*math.log10(v)) for i,v in enumerate(values)]\n    result = _aggregate(rows, 'main')[0]\n    assert result['n_scenarios'] == 3\n    assert math.isnan(result['Q']) if pos == 0 else result['Q'] == 2e-6\n    print(pos, result['Q'], result['n_scenarios'])\nPY",
+        "rg -n 'from search_ir|import search_ir|emulate_ddc_candidate|verievolve-search-ir-v1|satisfaction|attempt_ledger' /Users/chengzhy/verievolve -g '*.py' -g '!refine-logs/**'",
+        "git -C /Users/chengzhy/verievolve status --short; git -C /Users/chengzhy/verievolve diff --cached --stat"
+      ]
+    },
+    {
+      "confirmed": [
+        {
+          "counterevidence": "这是旧 PARAMS 模板评价器，不是已接通的 typed-IR 搜索缓存。任务目录与参数哈希能区分基本输入；损坏的 JSON 会重新调用后端，本轮 mock 已验证这一保护。Nangate45 在此处是附加指标，/Users/chengzhy/verievolve/examples/comm_dsp_bench/cert_evaluator.py:219-228 对缺失面积显示 n/a，不能把 ice40 主评分成功说成错误。没有证据表明历史论文面积已经受影响。",
+          "end_line": 114,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/cert_evaluator.py:76-83 仅用 task/PARAMS 建缓存目录；:86-93 见到 design.v 就不再生成；:96-114 直接复用可解析 synth.json，并在 ice40 成功时保存 area_um2=null、丢弃 ASIC 错误。本轮从实际文件 AST 提取原函数体，在系统临时目录注入 mock：生成器改变后仍返回旧 RTL；修改 RTL 后仍命中旧综合结果且后端调用次数不变；ASIC 首次失败后，即使 mock 后端已恢复，同一缓存条目仍不重试。所有面积字段均为故障注入占位值，不是综合测量。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/cert_evaluator.py",
+          "gate": "B 可新建独立适配器，不要求先改动历史流程；若复用此实现，必须先隔离旧缓存并补失效测试。C/正式搜索不得使用仅参数身份的面积缓存。",
+          "id": "SYNTH-01",
+          "kind": "actual-defect",
+          "line": 76,
+          "recommendation": "分别定义 RTL 生成身份和综合请求身份，绑定实际生成依赖、RTL 内容、工艺库、映射脚本及有效工具链身份；命中时校验结果 schema/status/request hash。各后端独立记录成功或失败，明确可选 ASIC 的重试策略。采用新缓存 namespace，保留历史产物。SYNTH-02 的失败固化症状合并在本项，不重复计数。",
+          "scenario": "同一 task/PARAMS 下修复生成器、替换 RTL 或改变综合依赖后重新评价，仍复用旧 RTL/面积；或者首次可选 ASIC 后端失败，随后恢复却一直命中保存了空 ASIC 面积的条目。",
+          "severity": "high",
+          "title": "旧模板缓存未绑定生成物和综合依赖，且会固化可选后端失败"
+        },
+        {
+          "counterevidence": "两个 DDC helper 正常使用新临时目录，不是默认复用旧 stat；三条路径都显式处理 TimeoutExpired，本轮分别验证了 timeout 拒绝结果。没有观察到真实 Yosys 在历史运行中非零退出却留下可解析面积，故障复现只证明实现的成功判定缺口，不能据此撤销历史面积。",
+          "end_line": 211,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:199-211 未检查 p.returncode，只要 stat 中匹配面积就返回成功；/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_s2.py:47-58 和 /Users/chengzhy/verievolve/examples/comm_dsp_bench/evaluator.py:422-435 相同。本轮对三个实际函数体分别 mock subprocess.run，写入含目标模块面积的临时 stat 并返回 returncode=1，三个 helper 均报告成功；没有启动工具进程。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py",
+          "gate": "B 的新适配器应先建立失败状态测试；C 前，任何实际使用的综合 helper 必须拒绝非零退出。历史 helper 若不被新管线复用，不构成进入 B 的先决修复项。",
+          "id": "SYNTH-03",
+          "kind": "actual-defect",
+          "line": 199,
+          "recommendation": "先检查工具退出码，再解析本次生成的完整结果；分别记录 timeout、启动失败、非零退出、解析失败和未完全映射。新适配器使用版本隔离；旧 runner 源文件已被历史 preflight 指纹绑定，不应为修复而静默重写历史 manifest。",
+          "scenario": "工具写出 stat 后最终非零退出，或者允许调用方传入的旧 workdir 中已有 stat，当前 helper 仍可能将失败工具调用识别为成功面积。",
+          "severity": "medium",
+          "title": "三条旧面积解析路径未将工具非零退出判为失败"
+        },
+        {
+          "counterevidence": "candidate_hash 作为已声明 IR 内容的稳定身份没有被推翻；现有 metadata/字段顺序/结构参数变化测试本轮通过。validator 确实检查 schema/formula/contract 版本以及 coefficients_id，见 /Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/validate.py:159-160、:187-193。当前没有证据显示新 IR 已使用此 hash 缓存评价结果。旧 witness 另有固定 FIR 整数系数及源文件指纹，不能把该缺口套到其既有保护上。",
+          "end_line": 41,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/canonicalize.py:39-41 的注释称此 hash 用于评价和综合缓存，但计算仅覆盖 IR JSON。/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py:132-136 运行时解析原型系数，/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/ref_chain.py:19-25 依赖外部 spec 和 SciPy。独立内存诊断保持同一合法 IR，只 mock prototype_taps 的返回值，确认整数系数与 lower_ddc_rtl 结果改变而 hash 不变；恢复 mock 后 RTL 恢复。未修改协议字段、阈值或候选池。在已检查的实现和测试中，尚未发现绑定这些依赖的独立请求身份层。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/canonicalize.py",
+          "gate": "B 应先确定语义身份、lowering 身份与后端请求身份的边界；C/正式搜索前须有依赖变化、缓存失效及结果回显测试。属于 missing-gate，不是新搜索已发生缓存污染。",
+          "id": "SYNTH-04",
+          "kind": "missing-gate",
+          "line": 39,
+          "recommendation": "保留 semantic hash，另建立版本化 lowering manifest 与综合/质量请求 hash。至少绑定实际系数、生成 RTL、有效后端契约及质量场景契约。将同 IR、不同解析依赖的诊断变成必须拒绝旧结果的测试。SYNTH-05 的工具环境字段并入该设计，不另计一个已发生的故障。",
+          "scenario": "未来若只以 candidate_hash 复用面积或质量，同一 IR 在系数解析、lowering、工艺库、映射脚本或评价契约改变后可能命中不属于当前请求的结果。",
+          "severity": "high",
+          "title": "IR 语义哈希尚不能独立承担综合与质量缓存身份"
+        },
+        {
+          "counterevidence": "typed IR 到完整模型/RTL 已有实际实现，不能说 lowering 尚未接通。/Users/chengzhy/verievolve/tests/test_search_ir_lowering.py:165-181 甚至已有 NCO 组合的通用 synth/check 测试，而不只是 proc/opt/check；但仍不是 Nangate45 全链面积验收。协议 /Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:1-11 明确是草案，并公开声明冻结场景、Nangate45 和 R4 尚未完成。没有观察到新管线已经发生层级面积漏计。",
+          "end_line": 250,
+          "evidence": "/Users/chengzhy/verievolve/tests/test_search_ir_ddc.py:234-250 与 /Users/chengzhy/verievolve/tests/test_search_ir_fir.py:175-192 只做结构检查，没有 liberty 映射或面积解析。/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_rtl.py:401-455 输出含 NCO/FIR 实例的完整层级 RTL，组合 NCO 还在 :22-76 产生子模块。旧 witness 实际综合 gen_nco_verilog 的 NCO-only；旧 S2 使用 /Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_s2.py:39-44 的 +amap 脚本和 :86 的旧 full-DDC 生成器。两者都不是新 typed-IR 全链适配器，现有 top 面积正则也没有为新层级定义统计口径。",
+          "file": "/Users/chengzhy/verievolve/tests/test_search_ir_ddc.py",
+          "gate": "可作为 B 基础设施工作包；当前不足以签署 C 的 full-DDC 面积验收或 R4，也不足以放行正式搜索。不作 S0 判断。",
+          "id": "SYNTH-06",
+          "kind": "missing-gate",
+          "line": 234,
+          "recommendation": "新建 typed-IR 全链综合入口，固定 top、Verilog 模式、flatten/层级统计策略、脚本和面积 scope，并先用多层级 mock stat 验证解析。后续只有在另行授权的综合阶段，完成至少两个 NCO 与两个 FIR/decimator 结构类的合法性和工艺映射验收，才可签署 R4。",
+          "scenario": "把旧 NCO-only witness、旧 S2 面积或新 IR 结构检查直接替代新 full-DDC R4；或者未经定义层级统计策略，就把新 RTL 送进只抓取 top 单模块面积的旧 helper。",
+          "severity": "high",
+          "title": "新 typed-IR 全链工艺面积适配器和 R4 尚未验收"
+        }
+      ],
+      "domain": "阶段 A 独立复核：synthesis-cache",
+      "established_invariants": [
+        "本轮独立确认了旧 witness 的保护，而非仅引用初审。/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:65-76 重建比较 preflight；:263-275 校验冻结输入哈希；:470-487 回显 execution/candidate-set 身份并以 exist_ok=False 创建 run 目录。隔离 mock 验证了输入哈希漂移被拒绝、已有 JSON 产物不被覆盖；没有执行 run_truth。",
+        "本轮只读核对 /Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/frozen_inputs_v1/execution_manifest.json:4-19 引用的四个文件，以及 /Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/preflight_manifest.json:313-323 登记的十个源文件，当前内容哈希均匹配。liberty 内容与实际脚本常量也匹配清单。此结论仅关乎文件身份，不是历史实验复验。",
+        "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/prepare_witness_v1.py:118-142 已真实冻结 NCO-only、top=nco_map、Nangate45 typical、脚本和 liberty 内容、Yosys 路径/版本、sdc=null，并禁止时序/功耗主张。不能称为完全没有冻结综合口径。",
+        "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_rtl.py:401-425 的 FCW 是运行时 32 位输入；/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/rtl_gen.py:378-399 使用外部 FCW 参数生成旧硬件且接口无 ready。两条 full-DDC 硬件口径不能混用；场景 FCW 不自动成为可编程 RTL 的面积缓存维度。",
+        "/Users/chengzhy/verievolve/tests/test_search_ir_schema.py:52-64 的现有 hash 测试本轮直接调用通过，没有执行 pytest 自动插件或其他带仿真/综合的测试。",
+        "/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:4、:9-11 的草案状态未被任何本轮检查推翻。缺实现/缺验收不是正式搜索失败，更不是 S0。"
+      ],
+      "gate_assessment": "从本域看，可形成进入 B 的基础设施实现计划，但本轮不执行或授权 B。进入 B 前应由主会话确认工作包边界：采用新 typed-IR 适配器与独立缓存/run namespace；明确完整请求身份、后端成功/失败状态、面积层级口径以及 mock 验收清单；保留历史 witness 及已暂存变更，不把协议草案擅自改称冻结。B 的完成条件还须由评价器/预算域共同验证 candidate manifest 接入、场景契约回显、schema/type/lowering/sim/synth 失败均计提案，以及缓存命中仍计提案。当前不能签署 C 的 full-DDC 面积验收/R4，不能放行正式搜索；这些是尚未落实的门禁，不是 S0。",
+      "limitations": [
+        "未运行任何真实综合、RTL 仿真、场景 truth、witness、正式搜索或 LLM。mock 中的数值不代表面积、误差、失败率或历史结果影响幅度。",
+        "未执行完整 load_and_validate_preflight，也未查询当前 Yosys 版本或运行 ABC；初审提供的二进制哈希及版本未作为本轮新鲜复验结论。实际 ABC 选择和完整工具资源依赖仍需后续受控阶段确认。",
+        "完整提案账本、同臂公平性、typed-IR evaluator 的场景契约验收不属于本域已证明的性质，需要主会话合并其他领域复核；不能从旧综合 helper 推断其已满足或已发生漏计。",
+        "技能所要求的外部跨模型接口不可用，本轮是独立会话的代码与 mock 复核，不冒称完成该技能的跨模型审计流程。",
+        "本轮未写改任何仓库文件，未 git add/commit/push。开始和结束 git status 均显示原有七项暂存变更、Iknow.md 的既有未暂存修改，以及未跟踪 MANIFEST.md/refine-logs；未处理这些内容。Iknow.md 的统一补充留给主会话。"
+      ],
+      "rejected_or_narrowed": [
+        "SYNTH-02 不单列独立的“主综合失败被当成功”。/Users/chengzhy/verievolve/examples/comm_dsp_bench/cert_evaluator.py:202-228 明确以 ice40 为主评分、ASIC 缺失显示 n/a。经 mock 确认的实际问题是可选 ASIC 失败原因丢失且缓存阻止恢复，已并入 SYNTH-01；不能外推为 ice40 评分错误或正式 IR 预算漏计。",
+        "SYNTH-05 从独立 missing-gate 收窄为 SYNTH-04 的冻结字段建议。/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/prepare_witness_v1.py:118-142、:214-227 已有工具路径/版本、liberty/script、源文件和数值环境身份。未登记 binary/ABC/数据资源是新受控环境应补足的依赖说明，不证明当前工具漂移；可用锁定安装包或环境摘要覆盖，不必把每个宿主绝对路径塞进 semantic hash。",
+        "SYNTH-07 保留为迁移建议而非新 runner 的实际缺陷。/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_s2.py:63、:78、:102-103 确有固定路径覆盖与弱身份记录，但它是旧初步流程；/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:470-487 已有不可覆盖目录与身份回显。没有证据表明新搜索正在调用旧 S2 主入口。",
+        "不将“timeout 改变仍命中成功面积”单独视为错误。timeout 不一定改变成功映射结果；其是否参与成功缓存键，应由预注册复用/计费策略决定。timeout 与重试条件必须进入请求记录和失败缓存策略，不能无条件固化暂态失败。",
+        "不采纳“层级 RTL 已发生面积漏计”或“所有新 IR 测试都没有 synth”的扩大表述。/Users/chengzhy/verievolve/tests/test_search_ir_lowering.py:165-181 有通用 NCO synth/check；缺的是新 full-DDC Nangate45 映射和明确层级面积口径，当前没有实际综合数据可量化漏计。",
+        "不要求进入 B 前直接修补被历史指纹绑定的旧 runner。可通过新适配器隔离旧缺陷；若修改历史路径，应建立新的版本与证据身份，不能回写冻结清单使旧结果伪装成新实现结果。"
+      ],
+      "required_fields": [
+        "候选与 lowering：原始提案/attempt_id、验证后的规范 IR、schema/formula/contract 版本、semantic_hash；独立 lowering manifest 记录有效代码依赖版本或内容摘要、实际 FIR 整数系数/LUT 常量指纹、数值环境，以及生成 RTL 字节 hash。coefficients_id 名称不能替代内容指纹。",
+        "综合请求：backend、工艺角、liberty 内容 hash、完整脚本模板 hash、top、读取模式、flatten 或层级统计策略、SDC 或明确无约束、RTL hash、实际 include/readmem 输入（若有），及参数绑定方式。临时工作目录绝对路径不应制造无意义缓存分裂。",
+        "工具身份：实际 Yosys/ABC 和相关数据资源的可验证身份，可用二进制与资源摘要或锁定工具环境摘要统一覆盖；记录版本、有效路径及受控环境。不能仅凭历史版本字符串断言当前工具完全一致。",
+        "运行策略：timeout、重试规则、失败缓存有效性、缓存命中计费策略应预先登记；是否允许不同 timeout 复用已成功面积要写清，不把时间预算自动等同于电路身份。",
+        "面积定义：严格区分 NCO 组合映射、带相位累加器的 NCO、full-DDC；明确握手/状态及子模块是否计入、共享定义与实例计数、完整映射要求、面积单位。FCW 固定绑定时记录具体值；运行时输入则记录其端口语义，不把每个质量场景都无条件复制成面积请求。",
+        "质量请求：独立 quality_request_hash，绑定场景 manifest/hash、FCW/seed、参考模型和指标实现、reset/握手/抽取相位、预热/对齐/测量段，以及已有质量定义与阈值。不得在接入时改变冻结契约。",
+        "结果与预算：回显 candidate/lowering/request/run-manifest/RTL 身份；明确 success/timeout/tool-error/parse-error/unmapped 等状态，退出码、耗时、日志及解析口径。schema/type/lowering/sim/synth 的失败和缓存命中都关联原始提案账本，重试不能抹去尝试记录。",
+        "运行目录：独立 run_id、不可覆盖目录、请求 manifest 先行、原子完成发布及失败终态；历史 witness/旧 S2 产物和缓存 namespace 不复用、不覆盖。以上是进入 B 的设计/实现验收清单，不是声明协议已经冻结。"
+      ],
+      "summary": "独立复核后将原七项收敛为四个独立问题：两项可 mock 复现的旧实现缺陷，以及两项新 typed-IR 管线尚未落实的门禁。SYNTH-02 合并并收窄到可选 ASIC 缓存恢复问题；SYNTH-05、SYNTH-07 仅保留为身份冻结与迁移建议。旧 witness 的文件身份和拒覆盖保护真实存在；它们既不能被抹去，也不能外推成新 full-DDC R4。可以准备 B 工作包，当前不签署 C/R4或放行正式搜索，不判 S0。",
+      "verification_commands": [
+        "已执行：git -C /Users/chengzhy/verievolve status --short；git -C /Users/chengzhy/verievolve diff --cached --stat。开始/结束状态一致，未操作暂存区。",
+        "已执行：rg -n '(_synth_cached|_materialize|_synth_nco_area|synth_area|candidate_hash|synthesis_request_hash|semantic_hash|lower_ddc_rtl|lower_ddc_bittrue)' /Users/chengzhy/verievolve/examples/comm_dsp_bench /Users/chengzhy/verievolve/tests -g '*.py'。用于追踪实际调用与测试，不据搜索结果冒称全仓库实现证明。",
+        "已执行内联诊断命令前缀：PYTHONDONTWRITEBYTECODE=1 /Library/Frameworks/Python.framework/Versions/3.10/bin/python3 -B -。诊断一从真实 AST 提取缓存和三个综合函数，mock 所有后端，在系统临时目录验证陈旧缓存、可选 ASIC 失败固化、非零退出被接受及 timeout 拒绝；脚本未落盘。",
+        "已执行相同 Python -B 前缀的内存诊断：直接调用 /Users/chengzhy/verievolve/tests/test_search_ir_schema.py 的 test_candidate_hash_ignores_metadata_and_mapping_order；另对 ref_chain.prototype_taps 做临时 mock，确认同 IR/hash 可生成不同系数和 RTL，退出 mock 后恢复；未运行仿真。",
+        "已执行相同 Python -B 前缀的只读身份诊断：核对 execution 引用文件、preflight 源文件、liberty 和脚本常量摘要；另用 AST 隔离的 witness loader/writer 在系统临时目录验证 hash 漂移与已有产物拒绝。没有调用完整 preflight 构建、综合或 truth。"
+      ]
+    },
+    {
+      "confirmed": [
+        {
+          "counterevidence": "旧 runner 的 /Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:65-76、263-275 会重建 preflight 并核对 execution 引用摘要，因此覆盖通常造成显式拒绝，而非静默混算。本次只覆盖系统临时目录中的测试文件；历史文件没有改动。",
+          "end_line": 251,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/prepare_witness_v1.py:248-251 在构造 manifest 后直接执行 OUT.write_text，没有存在性检查或独占创建。本次将 OUT 指向临时 sentinel 文件、仅替换 manifest 构造器后调用真实 main，sentinel 确被替换。历史 preflight 登记 HEAD 为 5a720e5e759dc3d1c2e040e87160e88cb5a8b5ac，当前观察到的 HEAD 为 988b9dec76794d994e059af291884da85b2edf2f；二者不一致。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/prepare_witness_v1.py",
+          "gate": "列入 B 修复项；在修复和验收前，不得用重跑此入口的方式更新已被历史 execution 引用的 preflight。不是正式搜索已经失败的证据。",
+          "id": "LEDGER-A1",
+          "kind": "actual-defect",
+          "line": 248,
+          "recommendation": "新准备流程使用独立版本/run-id 路径及独占创建；已有文件即拒绝，或仅在字节完全相同时作只读幂等返回。保留历史 preflight，不以覆盖文件解决版本漂移。",
+          "scenario": "已有 execution/truth 引用固定 preflight 路径后，再次运行 prepare_witness_v1.main；构造器成功时，原预检内容会被覆盖。若新旧内容不同，旧 execution 的摘要引用随即失效。",
+          "severity": "中：条件性实现缺陷",
+          "title": "preflight 准备入口可以覆盖证据链已引用的文件"
+        },
+        {
+          "counterevidence": "正确的报告生产者 /Users/chengzhy/verievolve/tests/test_ddc_nco_rtl_equiv.py:100-124 会据 mismatch 生成布尔 pass，并记录完整候选、覆盖量和映射摘要。本次独立读取的历史报告，其候选名、完整参数及零 mismatch 均匹配；现有历史文件测试也通过。冻结后更换报告会被 preflight 全字段及摘要比较拦截。",
+          "end_line": 154,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/prepare_witness_v1.py:145-154 只检查 schema、26 条结果和 pass 真值；159、230-236 将其作为预检通过依据。本次临时报告诊断确认：将结果键全部改成外来名字，或保留名字但设置 mismatch=7、n_states=0、pass=True，均被真实消费者接受；pass 为字符串 \"false\" 也被接受。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/prepare_witness_v1.py",
+          "gate": "新建冻结链或复用报告消费 gate 前应修复；不能据此撤销历史对拍，也不能把历史报告当作新实现的当前复验。",
+          "id": "LEDGER-A2",
+          "kind": "actual-defect",
+          "line": 145,
+          "recommendation": "消费端核对候选全集及完整参数，要求 pass is True、mismatch==0，验证覆盖量与等价类分区。新报告绑定模型、RTL 生成器、测试生成器、候选和工具身份；不得事后给旧报告补写出处并声称当时已经验证。",
+          "scenario": "首次冻结或创建新冻结版本时，读入陈旧、错池或自相矛盾的报告。消费者仍可通过，无法证明报告支持本次待冻结候选。该问题不表示更换报告能绕过已有 execution 的严格校验。",
+          "severity": "中：条件性实现缺陷",
+          "title": "RTL 报告消费端没有核验候选身份和严格通过条件"
+        },
+        {
+          "counterevidence": "当前默认 baseline 输出目录已经存在，/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_linear_baseline_v1.py:182-184 会首先拒绝重跑；即使使用新 OUT，真实 preflight 仍有版本漂移保护。历史 truth→execution 摘要本次检查匹配，最终 baseline 也记录 truth 文件摘要。不能称当前默认入口已混接结果。",
+          "end_line": 191,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_linear_baseline_v1.py:187-191 校验 execution 后直接加载 truth，只比较当前候选名与 preflight；96-105、122-125、142 后续取 truth 数值时不校验其 schema/execution 身份。本次复制 truth 到临时目录，仅破坏 schema_version 和 execution_manifest.sha256，使用新临时 OUT，并用已登记 preflight 代替环境重建这一前置条件；真实 execution loader 仍核验所有引用摘要。baseline 随后到达第一条 prediction，立即被哨兵异常停止，未执行预测或生成结果。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_linear_baseline_v1.py",
+          "gate": "仅在新 baseline 输出或复用该消费者前需要补齐；不作为当前历史结果失效依据。",
+          "id": "LEDGER-A3",
+          "kind": "actual-defect",
+          "line": 187,
+          "recommendation": "在 prediction 前验证 truth schema、execution 摘要、候选池身份及场景/质量契约；校验 rows、aggregate 与场景完整性。保留文件摘要回显，但不要用事后记录替代输入验证。",
+          "scenario": "输出目录尚不存在且 preflight/execution 前置校验通过时，TRUTH 是数值行仍可用、但来自另一 execution 或身份元数据损坏的文件。现有消费者不会因这些身份字段错误而拒绝计算。",
+          "severity": "中：条件性实现缺陷",
+          "title": "新 baseline 计算没有验证 truth 对 execution 的绑定"
+        },
+        {
+          "counterevidence": "helper 已处理 TimeoutExpired、缺少 stat 和找不到指定 nco_map 面积字段；/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:214-220 会拒绝带 error 的面积行。统计文件位于新临时目录，并非跨运行任意复用旧日志。本次没有运行综合，不能推断历史工具失败或面积无效。",
+          "end_line": 211,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:198-211 未检查 subprocess 返回码。本次以内存 mock 替代 subprocess.run，模拟本次调用写入可解析 nco_map stat 后以 returncode=7 退出；真实 helper 返回包含 area_um2、没有 error 的成功形态。模拟数值不作为面积证据。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py",
+          "gate": "复用该综合 helper 前修复；未来 attempt ledger 必须将非零退出记录为 synth failure 并计预算。",
+          "id": "LEDGER-A4",
+          "kind": "actual-defect",
+          "line": 198,
+          "recommendation": "先要求 returncode==0，再解析和校验统计；失败返回退出码及日志摘要，不能因存在可解析 stat 而视为成功。保留原有 NCO-only scope，不借修复改变综合口径。",
+          "scenario": "同一次外部工具调用已经写出 stat，但随后失败、被终止或包装器返回非零状态时，只要统计可解析，现有 helper 就可能返回成功面积。",
+          "severity": "中：条件性实现缺陷",
+          "title": "可解析 stat 会掩盖综合进程的非零退出"
+        },
+        {
+          "counterevidence": "typed IR 并非只有文档：schema、校验、canonical hash，以及 /Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py:216-256、/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_rtl.py:401-455 的完整 DDC lowering 已存在。旧 witness 有意只做固定下游的 26-NCO 实验，不是一个已经接错 IR 的搜索器。",
+          "end_line": 468,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:453-468 重建固定字典候选池，284-289 调用旧 fixed_chain.run_candidate。/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/__init__.py:8-35 仅导出表示、校验和 lowering。本次全库 Python 接线检索只见测试导入 search_ir，包中没有 actions、candidate/action manifest loader 或冻结场景 evaluator。/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:277-290 仍将这些列为后续工作。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py",
+          "gate": "正式搜索阻断；可以作为 B 的 adapter/manifest 实现工作，不是已发生实验错误。",
+          "id": "LEDGER-M1",
+          "kind": "missing-gate",
+          "line": 453,
+          "recommendation": "建立独立 typed IR candidate/action manifest 和冻结场景 evaluator adapter，经现有 lowering 评价完整候选，回显场景、质量和全链综合上下文；不把旧 witness 换候选表后直接宣布闭环完成。",
+          "scenario": "准备把组合 IR 交给现有 witness runner，或直接接入 proposer 时，尚没有可消费统一 IR、绑定公共动作及冻结场景并输出同契约 q/全链 area 的执行入口。",
+          "severity": "正式搜索阻断：未落地 gate",
+          "title": "typed IR 到冻结场景评价的执行接线尚未落地"
+        },
+        {
+          "counterevidence": "/Users/chengzhy/verievolve/openevolve/process_parallel.py:626-628、817-828 对返回错误和处理异常仍增加 completed_iterations；/Users/chengzhy/verievolve/openevolve/evaluator.py:153-168、252-296 存在重试、超时与失败处理。旧 witness 遇评价异常会中止，不会写成完整成功。因此“框架完全不计失败”不成立。",
+          "end_line": 515,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:489-515 仅维护内存 rows、split checkpoint 和最终结果；尚无逐提案持久化记录。实际 search_ir 包没有 runner/ledger，全库 Python 检索未找到 search_manifest、attempt_id 或 raw_proposal_sha 的实现接线。/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:121-144 提出了重复及所有失败计提案的要求，但该文档仍为草案。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py",
+          "gate": "正式搜索预算公平性阻断；进入后续运行验收前须补状态机、故障注入和恢复测试。",
+          "id": "LEDGER-M2",
+          "kind": "missing-gate",
+          "line": 489,
+          "recommendation": "在 JSON/schema 校验前持久化 attempt 身份和预算占用；逐次记录重复、缓存命中、schema/type/lowering/sim/synth 失败及超时/取消。提案次数与内部 retry/tool-call 成本分账；恢复时按持久化状态处理进行中尝试，不能只数成功结果。",
+          "scenario": "未来 proposer 输出非法 JSON/类型、重复结构，或在 lowering、仿真、综合、写结果时中断，目前没有共享持久化账本能证明每个提案恰计一次预算。",
+          "severity": "正式搜索阻断：未落地 gate",
+          "title": "新搜索缺少覆盖失败、重复和恢复的提案账本"
+        },
+        {
+          "counterevidence": "结构 hash 本来不必包含外部 FCW；当前 canonical JSON 的顺序稳定性及 metadata 排除测试通过。没有找到 typed IR 结果缓存，所以未观察到错误缓存命中。旧 witness 也冻结了自身的场景、代码和环境，不能称所有评价均无上下文。",
+          "end_line": 41,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/canonicalize.py:11-41 只散列规范化 IR；/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py:132-136 在运行时解析 FIR 系数，216-234 另接 FCW；/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_rtl.py:351-361、401-406 回显结构 hash，但未形成评价/综合 context key。检索没有发现 typed IR 缓存实现；canonicalize.py:40 的缓存说明不能作为缓存已存在的证据。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/canonicalize.py",
+          "gate": "上下文绑定与结果回显是正式搜索门禁；缓存本身不是必须实现的性能功能，但若启用，必须验证键隔离。",
+          "id": "LEDGER-M3",
+          "kind": "missing-gate",
+          "line": 39,
+          "recommendation": "分开结构身份、评价上下文身份和综合上下文身份。评价绑定实际系数/lowering、场景内容、FCW/seed/split及指标版本；综合绑定生成 RTL、工具链、liberty、脚本与约束。结果回显 search manifest hash；也可明确禁用缓存，但仍须记录上下文和计入重复提案预算。",
+          "scenario": "未来将 candidate_hash 单独用于跨场景、跨代码或跨工具链结果复用，会无法区分评价环境。现阶段缺少的是正式上下文契约，而非已经污染的缓存。",
+          "severity": "正式搜索阻断：上下文 gate；缓存实现可选",
+          "title": "结构 hash 尚不能独立承担评价和综合上下文身份"
+        },
+        {
+          "counterevidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:445-487 校验 run-id 并在评价前以 exist_ok=False 创建独占目录；470-480、511-515 的 run_manifest/results 回显 execution 摘要。本次顺序覆盖测试与重复目录创建测试均被拒绝。现有单写者 witness 不能据此判为覆盖缺陷。",
+          "end_line": 509,
+          "evidence": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:502-509 的 split checkpoint/main_decision 没有独立 run/manifest 身份；49-53 的通用写入 helper 是 exists 检查后 write_text，不是自身原子独占；519-535 没有 resume 入口。这些是复用边界，而不是当前 witness 的完整 run 保护失效。",
+          "file": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py",
+          "gate": "仅作为 B 新 runner 设计与验收建议，不新增历史 witness 的失败判定。",
+          "id": "LEDGER-R1",
+          "kind": "recommendation",
+          "line": 502,
+          "recommendation": "为脱离目录也可消费的产物添加 run/search manifest/attempt 绑定；多 worker 写入采用独占创建或锁定提交协议。明确选择可审计 resume，或失败 run 只读保留、新 run-id 重启；checkpoint 不代替预算账本。",
+          "scenario": "将 witness 的 helper/checkpoint 直接复制给多 worker 搜索器，或把独立 checkpoint 搬出目录并用于恢复时，原有外层独占目录与上下文保护不再自动成立。",
+          "severity": "低：后续设计建议",
+          "title": "checkpoint 与单写者保护不可直接外推为搜索恢复协议"
+        }
+      ],
+      "domain": "run-budget-integrity：阶段 A 只读独立复核",
+      "established_invariants": [
+        "/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:1-11 明确是 v0.1 草案，尚未冻结；其中 WP 进度声明不是本轮复验证据。预算政策只能称草案要求，不能称已冻结正式实验协议。",
+        "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:65-76、263-276 确有 preflight 全字段比较和 execution 引用摘要校验。当前 HEAD 与历史 preflight 不同；本次未重建完整 preflight，因此不重复宣称“唯一漂移字段就是 HEAD”。",
+        "/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/frozen_inputs_v1/execution_manifest.json 中 preflight 与三个 frozen input 的摘要，本次读取均匹配；/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/ddc_witness_v1/runs/formal-v1-20260930/results.json 的 execution 摘要也匹配。预检登记的十个代码摘要均匹配。这只是当前文件一致性检查，不是当时执行过程或当前数值结果的复验。",
+        "/Users/chengzhy/verievolve/examples/comm_dsp_bench/experiments_system/nco_rtl_equiv_v1/report.json 的候选名、完整参数及严格布尔通过/零 mismatch 与预检池匹配；/Users/chengzhy/verievolve/tests/test_ddc_witness_preflight.py:54-59 的测试核验历史文件，不会验证报告消费者能拒绝恶意或损坏输入。",
+        "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:445-487 在场景评价前独占创建 run 目录；470-480、511-515 回显 execution hash；502-509 将 main 判定落盘后才进入下一 split。未发现正常单写者入口会覆盖已有 run 的问题。",
+        "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/prepare_witness_v1.py:118-142 明确冻结的是 NCO-only、无 SDC 的面积口径，不能据此证明 typed IR 全链面积。/Users/chengzhy/verievolve/tests/test_search_ir_ddc.py:233-250 执行的是 hierarchy/proc/opt/check，没有工艺映射面积验收。",
+        "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/schema.py:159-185、/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/validate.py:173-222、两个 lowering 文件证明完整 IR 表示和接口已存在；尚缺 evaluator/manifest/ledger 接线，并非缺所有实现。",
+        "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_s1.py:140-156、186-196 仍是旧字典组合循环，且以可覆盖方式准备固定输出路径；旧 witness 明确禁用此入口，不能将其当作新搜索不可覆盖保证。"
+      ],
+      "gate_assessment": "不放行正式搜索，不判 S0。若 B 指受控修复与 adapter/ledger 实现，本域发现可以形成 B 的工作清单，不要求先实现完这些功能才讨论 B；但进入 B 前应明确 B/C 范围与可修改边界，按 /Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:193-201、237-257 审阅适用协议和接口，解决“仍为草案却要求冻结后实施”的前提，预先确定下列冻结字段及失败注入验收计划，且保留现有暂存内容和历史产物。本轮没有写入/实施授权，也未启动 B。若 C 指真实评价或面积验收，需先通过输入拒绝、预算状态机、并发不可覆盖、恢复、上下文隔离及 numerical/satisfaction 同候选同 q 测试，再按另行确认的范围验证新 FIR 的冻结场景与真实全链综合；NCO-only 历史结果及结构检查不足以放行。阶段 B/C 的正式定义未在本次材料中查到，不与 baseline Gate A/B 或协议 R/S 编号混用。",
+      "limitations": [
+        "本轮未启动服务、外部评审/LLM、搜索、RTL 仿真、任何综合、77 场景 truth 或 witness 重跑。没有新增真实面积、系统质量、RTL 一致性或 R4 通过证据。",
+        "四项缺陷验证使用系统临时目录和内存替换；A1 隔离了 manifest 构造，A3 隔离了 preflight 环境重建并使用新 OUT，A4 的 subprocess 完全为 mock。它们证明代码路径的条件性行为，不证明历史运行曾触发这些问题。",
+        "本次只执行八项限定纯 Python 测试，未运行整个测试集；未做多进程竞争或崩溃恢复实测。现有保护的范围根据代码和顺序隔离诊断确认。",
+        "技能已加载，但与本轮任务不相容的跨模型外部审查及报告文件写入流程没有执行；本报告是指定子任务的独立代码复核，不声称该跨模型技能流程通过。",
+        "开始与结束观察到相同的七项暂存路径及统计，Iknow.md 已同时有暂存/未暂存内容，MANIFEST.md 和 refine-logs/ 为既有未跟踪项。本子任务未写改仓库、未处理这些文件，未 git add/commit/push；Iknow.md 的记录由主会话统一处理。"
+      ],
+      "rejected_or_narrowed": [
+        "LEDGER-M1/M2/M3 保留为 missing-gate：目前没有正式 typed IR 搜索器、账本或缓存，不能表述为正式实验已经漏计预算、缓存污染或接错评价器。",
+        "LEDGER-M3 收窄：正式上下文绑定和回显是必须条件；实现缓存不是必须条件，可以预注册禁用缓存。candidate_hash 不含 FCW 本身也不是 bug。",
+        "LEDGER-A1 收窄：可覆盖会破坏引用链与原始文件保留；现有摘要检查通常会显式拒绝，不支持“覆盖后静默继续混算”的说法。",
+        "LEDGER-A2 收窄：缺陷在首次/新版本冻结时的报告消费 gate；正确生产者有 pass/mismatch 一致性，历史报告参数和内容本次均匹配，冻结后的漂移也有保护。没有推翻历史对拍。",
+        "LEDGER-A3 补充最早反证：默认 OUT 当前已存在，会在加载任何 manifest 前拒绝；只有新输出且 preflight/execution 前置条件通过时，truth 身份漏检才可到达。当前默认入口并不会直接重算。",
+        "LEDGER-A4 收窄到“本次调用已产生可解析统计但退出失败”的路径；不是跨临时目录的旧 stat 污染，也没有证明真实综合曾非零退出。",
+        "LEDGER-R1 不升级为 actual-defect：现有 witness 正常入口有独占 run 目录，通用 helper 的非原子性及 checkpoint 缺独立身份只影响直接复用为新搜索架构的设计判断。",
+        "不重复采信初审的“重建 manifest 仅 HEAD 不同”实验结论；本轮独立确认 HEAD 不同和代码摘要匹配，但未完整重建环境/工具预检。",
+        "未发现 B/C 的权威阶段定义；不自行把审计结论转换为实现授权，也不以 missing-gate 直接判 S0。"
+      ],
+      "required_fields": [
+        "协议与运行身份：search manifest schema/version/hash、协议内容摘要、run_id、代码快照及相关文件摘要、父运行/恢复来源、输出根目录、独占创建及不可覆盖规则；不能仅记录 HEAD 或 dirty 布尔值。",
+        "候选与动作：完整 canonical IR 和 candidate_hash、schema/formula/contract 内容版本、动作表及范围摘要、初始种群及顺序、proposer/selection/archive 配置和种子。无效 JSON 也必须有 attempt_id 与原始提案摘要/引用。",
+        "lowering 依赖：bit-true/RTL lowering 及实际调用依赖摘要、解析后的 FIR 整数系数及摘要、生成 RTL 摘要；不能只绑定 coefficients_id 或声明式版本字符串。",
+        "固定点与状态契约：输入/输出格式、舍入/饱和定义、状态初值/更新顺序、复位与握手行为、R=2 抽取相位和输出索引；明确当前 rne 实际使用的整数语义，不在本轮悄改。",
+        "场景与质量：场景契约内容摘要、split/scenario_key/FCW/seed、激励身份、暖机/对齐/测量段、desired-only 分母、q/Q 聚合、q_budget 与 epsilon_Q；新 FIR 上采用 E1 训练评价需单独 Gate A/B 验收。",
+        "综合：全链 scope/top、RTL/lowering 摘要、Yosys/ABC 身份、liberty 摘要、完整命令与脚本、约束内容或明确无约束、超时与成功判据。结构检查状态和真实面积结果必须分字段。",
+        "预算：预算占用起点、所有 proposer 共用上限、重复/缓存命中各计一次、schema/type/lowering/sim/synth 各失败终态、timeout/cancel/crash 处理，以及内部 retry/tool-call 成本与提案次数的独立统计。",
+        "缓存政策：是否启用、读取/写入边界、评价键与综合键的上下文闭包、错误是否缓存；即使禁用缓存也回显同一评价上下文，不能因此免除重复提案预算。",
+        "产物和恢复：run/search manifest/attempt 绑定、追加序号与状态机、完成标记、结果和日志摘要、并发提交协议；选择 resume 时明确进行中尝试的恢复及幂等扣账，否则明确失败 run 只读保留并以新 run-id 重启。",
+        "进入 B 的验收计划：预先列出损坏/错池报告与 truth 拒绝测试、非零工具退出测试、五类失败计预算测试、重复/缓存命中测试、上下文变动隔离测试、重复 run-id/并发写入测试及断点恢复测试。正式预算、seed 和统计规则仍按草案的 pilot 后冻结顺序处理，不在本轮代定阈值。"
+      ],
+      "summary": "独立复核保留四项条件性实现缺陷、三项未落地 gate 和一项设计建议；重点收窄了 baseline 的可达前提、旧 witness 的保护范围及缓存是否必须实现。八项限定纯 Python 测试通过，历史摘要链、代码指纹和 RTL 报告候选参数一致，但这些均不是当前 truth/面积/RTL 复验。技术上可据此准备受控修复与适配工作；正式搜索仍不具备准入条件，协议仍是草案，不判 S0。",
+      "verification_commands": [
+        "PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest -q -p no:cacheprovider /Users/chengzhy/verievolve/tests/test_search_ir_schema.py /Users/chengzhy/verievolve/tests/test_ddc_witness_preflight.py::test_preflight_q_calibration_and_threshold_are_exactly_defined /Users/chengzhy/verievolve/tests/test_ddc_witness_preflight.py::test_q_aggregation_uses_linear_max_and_reports_argmax /Users/chengzhy/verievolve/tests/test_ddc_witness_preflight.py::test_checked_in_rtl_report_is_machine_readable_and_complete —— 8 passed。",
+        "rg -n 'from search_ir|import search_ir|verievolve-search-ir-v1|raw_proposal_sha|attempt_id|search_manifest' /Users/chengzhy/verievolve --glob '*.py' --glob '!refine-logs/**' —— 核对实际接线。",
+        "rg -n 'candidate.manifest|action.manifest|attempt.ledger|search.manifest|load_execution_manifest|_validated_rtl_report|_synth_nco_area|拒绝覆盖' /Users/chengzhy/verievolve/tests /Users/chengzhy/verievolve/examples/comm_dsp_bench --glob '*.py' —— 核对消费者和保护测试。",
+        "PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY' ... PY（内联诊断简记，无仓库脚本落盘）：TemporaryDirectory + unittest.mock.patch 复核 A1/A2/A3/A4，阻断真实 subprocess；A3 在首条 prediction 执行前终止，同时核对历史 JSON 摘要链和候选参数。",
+        "git -C /Users/chengzhy/verievolve rev-parse HEAD",
+        "git -C /Users/chengzhy/verievolve status --short；git -C /Users/chengzhy/verievolve diff --cached --stat —— 开始/结束状态一致。",
+        "git -C /Users/chengzhy/verievolve diff --name-only；git -C /Users/chengzhy/verievolve diff --cached --name-only —— 只读确认已有改动边界。"
+      ]
+    }
+  ],
+  "completeness": "# 阶段 A 最终完整性结论\n\n**可以据此准备 B 的受控修复与接入工作包；不能签署 C、后续正式搜索或任何 S0/S1 结论。本审查没有启动或授权 B。**\n\n本轮直接阅读了实际 IR、lowering、旧 witness、通用搜索框架及相关测试，只补查跨域边界，没有重新开展四域全面审计。\n\n合并时应去重：\n\n- `IR-G1 / EVAL-07 / SYNTH-04 / LEDGER-M3` 属于同一组**上下文身份、缓存与结果封装 missing-gate**。\n- `EVAL-01 / LEDGER-M1` 属于 **typed-IR 场景 evaluator 尚未接入**。\n- `LEDGER-A4` 与 `SYNTH-03` 中的 witness 综合退出码问题相同，不能重复计数。\n- 不新增 actual-defect 判定；四域已经复现的缺陷仍沿用各自证据与限制，不能称为本轮再次复验。\n\n## 一、跨域合并必须补足的边界\n\n### X1．结构身份、实现身份、请求身份与尝试身份不能混为一个 hash\n\n**分类：missing-gate；具体分层形式属于 recommendation。**\n\n**直接依据**\n\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/canonicalize.py:28–41` 只散列规范 IR。\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py:132–136,216–256` 分别动态解析系数、接收场景 FCW，返回裸模型结果。\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_rtl.py:401–455` 生成可编程 FCW 的 RTL，注释回显结构 hash。\n\n**触发条件**\n\n未来把结构 hash 当成全部缓存身份，或反过来把 `attempt_id/run_id` 混进唯一计算缓存键：前者可能复用错误上下文，后者使重复提案无法有效复用计算。直接返回缓存中的旧结果 envelope，还可能把新提案错误关联到旧 attempt。\n\n**现有反证**\n\n结构 hash 本身不是错误实现；没有发现已接通的新 typed-IR 持久缓存。FCW 是运行时端口，场景 FCW 改变不必导致同一硬件重新综合。\n\n**最小建议**\n\n- 保留 `candidate_structural_hash`。\n- 评价身份覆盖实际 bit-true/系数/输入/场景/参考/指标契约。\n- 综合身份覆盖实际 RTL、完整源集合、top、映射工具及工艺契约。\n- 缓存保存与提议器无关的计算记录；每次命中重新生成绑定**当前** `run/attempt/request` 的结果 envelope，并保留缓存来源。\n- 可完全禁用缓存；但不能省略上下文验证、结果回显或重复提案计数。\n- manifest 必须明确散列范围并避免循环引用：不要同时要求“RTL 内嵌完整 manifest hash”和“该 manifest 包含同一 RTL 的字节 hash”。结构 hash 留在 RTL、完整 manifest hash 放结果 envelope 即可。\n\n### X2．完整 manifest 不能成为登记 attempt 的前置条件\n\n**分类：missing-gate。**\n\n**直接依据**\n\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/validate.py:173–222` 是候选校验入口。\n- `/Users/chengzhy/verievolve/openevolve/process_parallel.py:211–240` 包含生成与解析失败返回。\n- `/Users/chengzhy/verievolve/openevolve/process_parallel.py:626–628,817–828` 会处理错误并增加完成迭代计数。\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:489–515` 是 split 批量记录，不是新搜索逐提案账本。\n\n**触发条件**\n\n如果只有构造合法 candidate manifest、得到结构 hash 或完成 lowering 后才能创建记录，非法 JSON、类型错误和 lowering 中断仍处于预算记录之外。并发时仅在完成后扣数，也不能保证不超预算。\n\n**现有反证**\n\n通用框架并非完全不计失败；但内存中的 completed iteration 不是新搜索所需的持久、可恢复提案账本。\n\n**最小建议**\n\n采用两个时点：\n\n1. **parse 前**持久化原始提案身份与预算占用；允许 `candidate_hash=null`。\n2. 校验、解析依赖和生成物完成后，追加各阶段身份及状态。\n\n“一次提案恰计一次”是**整次 attempt 总共一次**，不是 schema/type/lowering/sim/synth 每经过或失败一个阶段各扣一次。内部重试另记成本；提议器再次提交相同内容则是新 attempt。并发预算预留、崩溃恢复或明确禁止恢复，都须预先定义。\n\n### X3．只过滤最终 prompt，仍不足以隔离 satisfaction 反馈\n\n**分类：missing-gate；不是已经发生的新搜索泄漏。**\n\n**直接依据**\n\n- `/Users/chengzhy/verievolve/openevolve/process_parallel.py:154–175,194–205` 将 metrics 用于排序，并把父代、历史个体、inspirations 和 artifacts 交给 prompt。\n- `/Users/chengzhy/verievolve/openevolve/prompt/sampler.py:128–165,182–194` 格式化 metrics、历史、特征及 artifacts；没有 satisfaction 白名单。\n- `/Users/chengzhy/verievolve/openevolve/database.py:858–870` 可直接用评价指标建立特征格。\n- `/Users/chengzhy/verievolve/openevolve/utils/metrics_utils.py:91–118` 在没有有效 `combined_score` 时使用数值指标平均值。\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:298–327` 返回连续 q、g、argmax 等丰富信息。\n\n**触发条件**\n\n未来把完整审计记录写进搜索器的 `Program.metrics/artifacts`，仅在展示时删除 q：连续量仍可能影响排序、特征格、历史选择或 tie-break；设定 `combined_score` 也不会自动隐藏 prompt 中的其他指标。\n\n**现有反证**\n\n这是通用框架的正常能力，当前没有 typed-IR satisfaction 搜索路径证明它已被错误连接。两种反馈导致不同搜索轨迹本身也是预期现象，不要求两臂最终选择相同候选。\n\n**最小建议**\n\n在**进入 proposer/selection/archive 之前**建立独立投影：\n\n- 私有审计记录保留原始 q、g、完整场景诊断和日志。\n- satisfaction 搜索状态只能获得冻结 verdict/pass count，以及共同允许的成本和硬失败信息。\n- 禁止通过特征、历史、错误文本、artifacts 或可读取的原始日志路径绕过投影；不能用隐藏 Q 打破 satisfaction 平局。\n- 白名单及排序、archive、停止规则一起版本化。不能只测试返回字典是否删掉 `q`。\n\n### X4．共同 JSON schema 不等于共同 action language\n\n**分类：missing-gate。**\n\n**直接依据**\n\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/schema.py:74–94,116–185` 提供构造器和候选树。\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/validate.py:119–127` 限制当前 compose 深度。\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/__init__.py:8–35,37–63` 导出表示、校验及 lowering，没有共同动作执行入口。\n- `/Users/chengzhy/verievolve/tests/test_search_ir_schema.py:24–98` 测试构造、hash 和部分拒绝路径，没有 proposer 间动作可达性测试。\n\n**触发条件**\n\nLLM 可一次完整重写多个子树，而非 LLM 每次只能调整一个参数；或非 LLM 在内部免费重抽非法动作，却只对 LLM 的非法输出计数。两者最终 JSON 都合法，仍不能证明动作和预算公平。\n\n**现有反证**\n\n当前没有这些 proposer 的新 IR 接线，不能宣称已经不公平。\n\n**最小建议**\n\n共同动作 manifest 至少定义操作、参数域、适用前置条件、patch 语义、父候选身份、是否允许多动作组合及其计数规则。完整 IR 提案与 patch 提案必须受同一可表达能力约束。非法动作不能通过某一 proposer 专属的免费修复或重采样隐藏。\n\n### X5．run hash 回显必须可验证，不能只是结果中的一个字符串\n\n**分类：新管线的 missing-gate；并发发布方式属于 recommendation。**\n\n**直接依据**\n\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/run_witness_v1.py:263–275` 实际验证旧 execution 引用。\n- 同文件 `470–487,511–515` 回显 execution hash，并独占创建 run 目录。\n- 同文件 `49–53,502–509` 的通用写入 helper 和独立 checkpoint 依赖外层运行上下文。\n\n**触发条件**\n\n新消费者只记录调用者声称的 hash，却不核对实际读取内容；或把旧单写者 helper 直接复制到多 worker 管线、把脱离目录的 checkpoint 当作恢复依据。\n\n**现有反证**\n\n旧 witness 的正常单写者入口已有真实拒覆盖及摘要校验，不能判它没有运行保护。\n\n**最小建议**\n\n- run manifest 先行、不可变；结果/checkpoint/失败记录绑定其真实摘要。\n- 消费端验证 schema、预期身份、实际内容 hash 和完整性，而不是事后补记文件 hash。\n- 新 run 使用独占目录；完成产物有明确提交状态。\n- 缓存命中不能绕过上述验证，失败记录也不能缺失 run/attempt 身份。\n\n### X6．“沿用契约”必须显式说明沿用哪些字段、哪些 scope 已改变\n\n**分类：missing-gate；阶段命名需主会话确认。**\n\n**依据**\n\n- `/Users/chengzhy/verievolve/thesis/CONTRACT_DDC_v1.md:4–8,90–95` 仍是草案，且限定固定下游、只改变 NCO。\n- `/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:4,38–45,58–68` 是联合 FIR 搜索草案。\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/schema.py:14–16` 的契约字段只是版本字符串。\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/prepare_witness_v1.py:118–142` 的旧面积契约明确为 NCO-only。\n\n**触发条件**\n\n把旧 witness 冻结状态或 `CONTRACT_DDC_v1` 字符串解释为联合 FIR 场景、饱和口径和 full-DDC 面积均已获准。\n\n**现有反证**\n\n旧 witness 有独立冻结对象；新搜索草案也明确承认尚缺验收，并未宣布这些 gate 已完成。\n\n**最小建议**\n\nB 前明确“继承的质量/场景字段”和“新增的联合 FIR/可行性/full-DDC scope”。饱和事件统计域仍须决策，不能直接接同名 `n_sat_fir`。B/C/D/E 的权威定义在所审文件中未见，不得与协议的 R 编号、线性代理 Gate A/B 或诊断 D gate 混用。\n\n## 二、B 前应确认的最小 machine-readable manifest 契约\n\n这里要求**先确认字段、来源和生命周期**，不是要求 A 阶段先实现或填出所有未来结果。尚未产生的字段应显式标记 `pending/not_applicable`，不能伪填通过状态。\n\n| 对象与生成时点 | 最小字段 |\n|---|---|\n| **run manifest，接收提案前** | `schema_version`、`run_id`、开发/正式模式、协议文件与内容摘要及冻结状态、实际代码快照摘要、引用的 action/evaluation/synthesis 契约、预算与停止政策、反馈白名单版本、初始种群及顺序、seed/随机性策略、缓存政策、输出命名空间、恢复政策、散列算法与序列化范围 |\n| **attempt 记录，parse 前** | `attempt_id/index`、`run_manifest_hash`、proposer/fitness 标识、原始提案不可变内容引用和字节摘要、提案形式、父候选身份、预算占用、阶段状态、失败原因、重复/cache-hit、内部重试和终态；无合法 IR 时候选 hash 允许为空 |\n| **candidate/lowering manifest，验证成功后逐步形成** | 完整 validated canonical IR、结构 hash、schema/formula/contract 版本、实际 lowering/依赖代码及环境身份、`coefficients_id` 与实际 taps/hq 内容或不可变引用、dtype/长度/字节序/量化规则、定点与状态/握手/抽取标签契约 |\n| **evaluation request** | 候选/lowering 身份、场景 manifest hash、split 授权、完整场景键/seed/整数 FCW、实际共享 ADC 输入摘要与格式、固定参考及 desired-only 分母契约、P/M 标签与测量规则、指标与阈值来源、mask 与饱和统计域版本 |\n| **synthesis request** | RTL 字节摘要、完整源/资源集合、top、FCW 运行时或特化模式、full-DDC scope、层级统计/flatten 策略、工具环境、liberty/脚本/约束摘要、成功判据；timeout/retry 单独记录，不自动等同电路身份 |\n| **结果及反馈 envelope** | 当前 run/attempt/candidate/request hash、阶段 status、完整性状态、退出码与日志摘要、缓存来源；原始质量/面积记录与 proposer 可见投影分离。`structural_check` 与 `mapped_area` 必须分字段 |\n\n补充两项不可省略的实现规则：\n\n1. **内容身份覆盖实际执行字节**，不能只写 HEAD、dirty 布尔值或版本名称。\n2. **manifest hash 不包含自身或未来结果**；阶段产物用追加引用形成无循环证据链。\n\n## 三、仍须等待 C/D/E 后续阶段的 gate\n\n以下是待完成证据，不表示这些阶段已经获准；具体阶段归属由主会话确认。\n\n1. **B 的软件边界验收**  \n   类型拒绝、非有限数值拒绝、场景完整性、共同动作、反馈隔离、预算状态机、身份漂移拒绝、不可覆盖及恢复策略。没有这些证据，不能进入真实场景/面积验收。\n\n2. **模型—RTL 与真实 full-DDC 验收**  \n   在预注册输入域或冻结 trace 上验证状态、握手、数值与标签；至少两类 NCO、两类 FIR，以及未手工注册组合的表示要求。随后单独完成工艺映射和完整层级面积验收。  \n   `/Users/chengzhy/verievolve/tests/test_search_ir_ddc.py:46–230` 只包含两个候选的特定流与背压测试；`234–250` 是结构检查。  \n   `/Users/chengzhy/verievolve/tests/test_search_ir_lowering.py:165–181` 虽有通用 synth/check，也不是 full-DDC Nangate45 面积。\n\n3. **场景质量与部署可行性验收**  \n   新 adapter 真正消费相同 ADC 输入、参考和 P/M 标签，执行完整场景集合、mask 与已决策饱和规则。有限合成数组、历史 witness 或旧 NCO-only 代理通过，均不能替代此门。若使用新 FIR 的线性代理，另过其 Gate A/B；直接使用完整 bit-true 不必扩展代理。\n\n4. **非 LLM pilot、正式冻结与搜索判定**  \n   按 `/Users/chengzhy/verievolve/thesis/SEARCH_PROTOCOL_v1.md:193–201,224–235,256–257`，完成适用表示门后再接 proposer；pilot 只决定预算和 seed 等获准项目，随后冻结正式统计规则。正式 S 搜索完成前不判 S0/S1；S1 前不启动真实 LLM 与完整 2×2。这里的后续阶段名称不能替代这些条件。\n\n## 四、不改旧冻结 witness 的新文件边界建议\n\n以下均为**拟新增路径**，本轮没有创建：\n\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/actions.py`：共同动作 API。\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_runtime/manifest.py`：输入身份、请求 hash、消费者验证。\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_runtime/attempts.py`：预算与持久状态机。\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_runtime/evaluate.py`：整数输入、标签、质量及可行性适配。\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_runtime/synthesize.py`：新 full-DDC 综合边界。\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_runtime/feedback.py`：私有审计记录到搜索可见记录的白名单投影。\n- `/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_runtime/runner.py`：独立 run namespace 和阶段编排；不默认触发真实工具或场景。\n\n不要把新 typed-IR 逻辑直接替换进旧 witness、旧缓存或其冻结清单。旧 witness 指纹实际包含公共 metrics、模型及 runner，见：\n\n`/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/prepare_witness_v1.py:92–108`。\n\n因此 B 可在新适配层补 fail-closed 检查；如果以后确需修改被旧指纹绑定的函数，应建立新版本证据链，**不得回写旧 manifest 使旧结果看似由新代码产生**。\n\n## 五、最小可执行回归清单——本轮不运行\n\n建议在以下拟新增测试文件中落实断言；不是声称这些测试已经存在或通过。\n\n| 测试文件 | 最小用例与通过条件 |\n|---|---|\n| `/Users/chengzhy/verievolve/tests/test_search_runtime_manifest.py` | metadata/映射顺序不改变合法结构身份；同版本字符串下改变实际系数、源码、场景输入、RTL、liberty/脚本，相关请求必须失配。仅改变运行时 FCW 时评价身份改变、同 RTL 综合可复用。篡改声明 hash 必须拒绝；缓存结果重新绑定当前 attempt。 |\n| `/Users/chengzhy/verievolve/tests/test_search_runtime_attempts.py` | 参数化注入 parse/schema/type/lowering/sim/synth 失败，以及 timeout/cancel；每次提案总扣一次、留终态。重复与 cache-hit 仍各扣一次；内部 retry 不新建提案。预算不足时拒绝新提案；并发预留不超额；断点按冻结恢复/禁止恢复政策处理。 |\n| `/Users/chengzhy/verievolve/tests/test_search_ir_actions.py` | 同一父 IR、动作与参数经不同 proposer 编码得到相同 canonical IR；非法动作同样拒绝计数。完整 IR/patch、多动作批次、边界参数和 compose 深度遵循同一规则，不允许免费修复重抽。 |\n| `/Users/chengzhy/verievolve/tests/test_search_runtime_feedback.py` | 构造 verdict/成本相同但 q、g、argmax、日志不同的私有记录；satisfaction 的 prompt、archive 输入、排序/tie-break 输入及 artifacts 不得变化。numerical 可见获准连续量。两者来源的 per-scenario q 必须一致；提前请求 heldout/stress 被拒。 |\n| `/Users/chengzhy/verievolve/tests/test_search_runtime_evaluate.py` | 合成整数输入验证 Q1.11→Q1.15、标签/P/M、共同缩放分母；拒绝缺失/重复/错标签场景、NaN 首中尾及 Inf；保留 `q=0`、展示 dB 为 `-inf` 的合法语义。mask 和饱和 gate 必须引用已决策规则，不能测试中临时发明阈值。 |\n| `/Users/chengzhy/verievolve/tests/test_search_runtime_synthesize.py` | 全部 mock：非零退出但有可解析 stat、timeout、缺 stat、错 top、多层级重复计数、未完全映射均拒绝。成功状态须绑定当前请求；暂态失败重试和后端独立状态遵循策略；占位面积明确不是测量。 |\n| `/Users/chengzhy/verievolve/tests/test_search_runtime_runner.py` | 重名 run 拒绝且旧字节不变；两个写者不能同时提交同一产物；阶段失败仍绑定 run/attempt；搬离目录的 checkpoint 身份失配被拒。新消费者拒绝错候选池/参数、`pass=\"false\"`、非零 mismatch 及错 execution 的输入报告。 |\n\n另外，在现有 `/Users/chengzhy/verievolve/tests/test_search_ir_schema.py` 补**直接解析原始 JSON**的类型负例，不经会自动转换类型的构造器；覆盖 bool/浮点整数/数组/对象/空值，确保得到约定的结构化拒绝。\n\n**覆盖限制**：这些回归主要证明软件边界与故障处理；mock 工具不证明面积，合成数组不证明冻结场景质量，有限动作样例不证明整个搜索空间，短 trace 不证明全部 RTL 状态域。真实映射、冻结场景、表示门及多种子搜索必须另行验收。\n\n## 本轮证据与操作限制\n\n- 本轮成功执行的操作只有文件阅读、定向检索和只读 Git 状态检查。一次内存 AST 诊断工具调用未成功执行，因此不计任何新诊断或测试通过数。\n- 没有运行仿真、综合、冻结场景、witness、服务、搜索或 LLM；没有将四域报告的测试数量相加或冒称本轮复验。\n- 已加载 experiment-audit 技能，但未执行其外部跨模型调用或报告落盘流程，不声称完成该完整技能流程。\n- 未写改仓库文件、未操作暂存区。开始和结束均观察到原有七项暂存变更、`Iknow.md` 既有未暂存变化，以及既有未跟踪项；这不证明其他会话期间没有并发操作。\n- `/Users/chengzhy/verievolve/Iknow.md` 留主会话统一记录。建议摘要：**阶段 A 允许形成 B 最小接入计划；重点补齐身份分层、parse 前预算占用、共同动作、投影前搜索状态隔离及新 run 证据链；当前不放行真实验收或正式搜索，不判 S0。**",
+  "scope": "阶段 A 只读审计；未运行 truth、综合或搜索；主会话负责文档登记"
+}

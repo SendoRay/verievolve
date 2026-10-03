@@ -16,6 +16,7 @@ sys.path.insert(0, str(BENCH))
 from search_ir.pilot import ArmState, area_key
 from search_ir.synthesize import lower_ddc_rtl, liberty_areas, validate_mapped_result
 from search_ir.canonicalize import canonical_json
+from search_ir.provenance import verify_source_record
 
 
 def digest(path):
@@ -34,7 +35,12 @@ def audit(root):
     assert len(result["trials"]) == result["budget_charged"] == 72
     assert result["S"] == result["L"] == "N/A" and manifest["formal_search"] is False
     contract = manifest["contract"]
-    for record in [*contract["sources"], contract["yosys"], contract["abc"], contract["liberty"]]:
+    for record in contract["sources"]:
+        verify_source_record(record)
+        # 回放必须仍执行同一动作/选择实现；修复的RTL另由实际生成字节核验。
+        if Path(record["path"]).name in ("pilot.py", "actions.py", "selection.py", "synthesize.py"):
+            assert digest(record["path"]) == record["sha256"], record["path"]
+    for record in (contract["yosys"], contract["abc"], contract["liberty"]):
         assert digest(record["path"]) == record["sha256"], record["path"]
     assert len(manifest["main_definition"]["scenarios"]) == 36
     assert all(s["split"] == "main" for s in manifest["main_definition"]["scenarios"])
