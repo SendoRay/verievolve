@@ -701,3 +701,26 @@ NCO（数控振荡器，也就是正弦发生器）有好几种硬件做法：�
 - 回看 `thesis/PROPOSAL_v1.md` §4.3 与 `thesis/SEARCH_PROTOCOL_v1.md` §3–4 后，下一工程目标改为 proposer-neutral 的 typed-IR action program：LLM 与强非 LLM proposer 必须共享同一 IR、合法动作、lowering、评价预算和失败计费。公开 action intent 不携带 RNG state、before/after 或 provenance；这些由执行层派生和记录。
 - quad 修复须先完成回归与独立复核，但不自动重跑 320 提案。GP joint/staged 保留为强基线；论文的决定性实验仍是 proposer×feedback 的 2×2，以及可选的诊断反馈消融。只有该统一接口通过验收后才接真实 LLM，避免继续用基础设施或 GP 调度实验替代“借用 LLM 探索能力把数学公式变成硬件”的研究问题。
 - ZCode 分工已校准：00:17 的 `msg_63c0ebaa` 实际落到旧的 `sess_bff62...` 窗口而非用户当前的 `verievolve`；该窗口未产生回复或代码，Codex 已终止仍等待它的持久发送器，避免双臂并发改同一批文件。用户当前 `verievolve` 会话被改派为唯一实现臂，任务仍是先复核 quad signedness，再实现 proposer-neutral 严格 JSON action-program 层；Codex 只做方向与验收。正式 truth、综合、formal rerun、held-out 和协议修改继续冻结。
+
+## 2026-10-03 typed-IR 提案接口实现（verievolve 臂，用户改派执行）
+
+- 新文件：`search_ir/proposal_contract.py` + `tests/test_search_ir_proposal_contract.py`（512 用例 passed；相邻全量回归 638 passed，含 quad signedness 定向回归 74 passed）。未改 actions.py、未扩大动作集合、未提交 git。
+- 公开意图层设计：意图只有 `{kind, path}`，仅 `change_interpolation`/`numeric` 加标量 value；before/after 在执行时基于中间候选树内部派生，每步复用 `actions._apply`（含逐级 validate）；四个结构动作的 after 由 `_structure_after` 确定性生成；numeric 的 mode/direction 属 GP 抽样 provenance，公开层拒绝，内部按字段合成 jump/uniform/toggle 仅满足 `_apply` 回放校验。
+- 公平性不变量：结构动作与 GP 确定性默认逐位一致；numeric value 与 GP jump/uniform/toggle 可达值域相同 → 两类 proposer 一步可达邻域一致，LLM 无法借公开层扩大动作空间。
+- GP adapter：50 seeds × 3 相位 × 3 开发候选，propose→program→apply_program 与原候选逐位相等、candidate_hash 相等、JSON 规范往返逐字节稳定；公开投影是多对一（neighbor/jump 同值同 intent），原始日志在 GP 侧保留备审计。
+- quad signedness 复核（A 项）：修复在位，`test_ddc_quad_signedness.py` 覆盖 5 depth × 9 phase_bits 全 65536 高位相位字的 iverilog 模型-RTL 对拍 + 非 quad 生成与修复前提交字节一致。
+- 协作教训：tincan 会话名会漂移——原 Codex 协调会话退出后 "claude" 名被 sess_75ffdb28 顶替；send_peer 带 expect_id 才能防止投错人。black 本机（python3.10）不可用，风格手动对齐，待有 black 的环境复跑。
+
+## 2026-10-03 项目进度快照（状态核查，未运行新实验）
+
+- 项目处于“DDC 工程闭环与非 LLM pilot 已完成，核心公平对照尚未完成”的阶段。正式运行原始终态为 inconclusive、S/L=N/A、cost-first=not-run；quad 修复报告通过不代表正式比较已重跑成功。
+- 评价证据仍为 E1：经典强线性模型解释固定池反转，实际设计损失未证；pilot 的 staged 优势只是描述性负信号。旧算子级真实 LLM 实验不能替代新 DDC 同 IR、同动作、同预算的 proposer×feedback 2×2。
+- 状态入口存在滞后：EXPERIMENT_TRACKER 仍留“运行中”快照，SEARCH_PROTOCOL 的实现进度也落后于 C/D 实物；应优先读原始终态、勘误与 Iknow 最新记录。六章论文正文仍主要承载旧算子级实验与旧术语，不等于最新主线已经成稿。提案接口新文件已在工作区出现，但未提交，不能混同已验收的正式搜索。
+
+## 2026-10-03 formal S 重跑前审计（verievolve 臂）
+
+- 真实进度比"从 WP6 开始"更靠前：WP6 引擎（joint/staged/cost-first）已实现，**pilot 已按冻结规则跑完**（PILOT_RULES_v1，B=12×3 seeds×2 臂；结论=joint 无正面面积信号，-2.342%±1.443% 描述统计；正式建议 B=32×5 seeds），WP8 formal S 协议已冻结（FORMAL_S_PROTOCOL_v1.json，sha b6766909 未变）。
+- 首次 formal 执行在 proposal 179 因 quad RTL signedness bug 中止（inconclusive，非 S0）；erratum（FORMAL_BACKEND_ERRATUM_v1）预注册了重跑纪律：37 个 pilot 候选全无 quad 叶子、RTL hash 不变（warm cache 兼容）、旧 quad 面积作废、新 readiness v2 + 新 run-id 完整重执行。
+- 重跑唯一卡点 = `FORMAL_S_READY_v2.json`（当前 runner 硬校验当前源码 digest c43b6046…；与中止 run 相比漂移 5 文件：rtl_gen 修复、formal_run 修订、provenance/validate_main 修订、proposal_contract 新增）。修复后的全量测试记录缺失（现有 FORMAL_TESTS 是修复前 digest），当前树实测 848 passed。
+- 墙钟风险（pilot 实测外推）：stage1 320 attempts ≈ 9–13h，冻结 stage_wall_limit=43200s 触线即 inconclusive；stage2 条件性另 12h。
+- 与 goal 的 WP6 清单差异：枚举切片、beam/MCTS 未实现——frozen protocol 只有 joint/staged/cost-first 三臂（pilot rules 明示"不前置 beam"）；增臂=协议变更，须用户拍板。

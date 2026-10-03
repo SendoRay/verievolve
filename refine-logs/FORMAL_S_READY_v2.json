@@ -1,0 +1,30 @@
+{
+ "status": "reviewed",
+ "code_checkpoint": "ffe76b5",
+ "created": "2026-10-03T10:41:11",
+ "protocol_sha256": "b67669094eab60512f17d7471be6bf25dfb4c0e8702f76d1d1e20fc9dacf4512",
+ "sources_sha256": "c43b6046ee0be5f67b477b24bb3d5311c111b1757ee985b55eddd6445896989b",
+ "verifier_sha256": "af95c3934ecb7d1191bcc4c64c98878f8236a5c06ed087a3500ea1c91b1797f0",
+ "verification_report_sha256": "ccb378b7ede4075303e638deb15000287dc57ce6dd76bb91e41e91c8fcac4d74",
+ "test_report": {
+  "path": "refine-logs/FORMAL_TESTS_20261003_104111.json",
+  "sha256": "89d36d53bdb78691792df69f0ae45125144927f5594159ddb1cf267c39409d50"
+ },
+ "reviewer": "verievolve-zcode-arm",
+ "review_is_not_an_S_result": true,
+ "delta_since_v1": {
+  "files": [
+   "chains/ddc/rtl_gen.py",
+   "search_ir/formal_run.py",
+   "search_ir/provenance.py",
+   "search_ir/validate_main.py",
+   "search_ir/proposal_contract.py"
+  ],
+  "rtl_gen_fix": "erratum FORMAL_BACKEND_ERRATUM_v1.md；qr 两操作数显式 signed，与 834d449 存档逐字节 diff 核对一致",
+  "formal_run_revision": "仅运转层：历史源码对账改走 provenance.verify_source_record、readiness 路径轮换为 v2；protocol_spec() 零改动（git diff 834d449..ffe76b5）",
+  "provenance_new": "字节级历史溯源：当前文件或 834d449 存档匹配，不执行旧代码、不放松当前漂移检查",
+  "proposal_contract_new": "proposer 公开意图契约层，未接入 formal_run、不改变 formal 语义；全部用例含于 test_report",
+  "verification_report_validity": "37 个 pilot 候选全无 quad 叶子，RTL hash 修复前后一致（erratum）；运行时 RTLChecks 仍对每个出现候选用当前代码重验证"
+ },
+ "review_conclusion": "no blocker: frozen protocol/SEEDS/BUDGET/epsilon unchanged (protocol sha identical to aborted run manifest); delta reviewed; current-tree tests all pass; warm area cache compatible per erratum and runtime key check"
+}
