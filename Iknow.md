@@ -724,3 +724,16 @@ NCO（数控振荡器，也就是正弦发生器）有好几种硬件做法：�
 - 重跑唯一卡点 = `FORMAL_S_READY_v2.json`（当前 runner 硬校验当前源码 digest c43b6046…；与中止 run 相比漂移 5 文件：rtl_gen 修复、formal_run 修订、provenance/validate_main 修订、proposal_contract 新增）。修复后的全量测试记录缺失（现有 FORMAL_TESTS 是修复前 digest），当前树实测 848 passed。
 - 墙钟风险（pilot 实测外推）：stage1 320 attempts ≈ 9–13h，冻结 stage_wall_limit=43200s 触线即 inconclusive；stage2 条件性另 12h。
 - 与 goal 的 WP6 清单差异：枚举切片、beam/MCTS 未实现——frozen protocol 只有 joint/staged/cost-first 三臂（pilot rules 明示"不前置 beam"）；增臂=协议变更，须用户拍板。
+
+## 2026-10-03 formal S 指导口径（运行中只读核查）
+
+- `formal-necessary-v2-20261003b` 是冻结的 **必要条件 + 条件性 cost-first** 检验：stage1 比较同一 GP 状态机下 joint 交错搜索与 staged 锁图策略；必要条件失败足以按预注册短路为操作性 S0，不能外推为联合搜索普遍无效。
+- runner 若最终写出 S1，只表示通过 `FORMAL_S_PROTOCOL_v1` 内的 staged 与 cost-first 两项门槛；总体 `SEARCH_PROTOCOL_v1` 仍列有可枚举切片、beam/MCTS 等强基线且自身标为草案。论文口径必须区分“runner S1”与“总体 Search-axis 证据闭合”，后者不能在缺失基线未冻结补齐前宣称完成。
+- 当前 formal 状态机直接调用 `actions.propose`，没有把 GP 提案实际重放经过 `proposal_contract`。这不破坏本轮 joint/staged 同动作内核比较，但 512 用例只证明可无损投影/重放，不能替代后续 L gate 的运行时公平性；进入 proposer×feedback 前，两类 proposer 必须统一走公开 action-program 执行路径并继续按 parse 前计费。
+
+## 2026-10-03 formal S 判定 S0（Search axis 终止）
+
+- `formal-necessary-v2-20261003b` 完整执行（320/320 计费，7.08h）：**joint-vs-staged 必要条件失败**——HV 差 bootstrap 95% CI [−0.0196, +0.0418] 含 0，工程命中 seed 2/5（要求 ≥3）。按预注册 stop rule 判 **S0**，cost-first 未触发，L/D=N/A。
+- 诚实细节：joint 在 seed 101（省 2761 μm²）和 307（省 805 μm²）确实找到超 ε_A 的更优面积点，但 3/5 seed 上劣于或平于 staged——改进不可靠，不能表述为统计结论。
+- 论文定位落到预注册组合 **E1 + S0**：机制 witness（局部指标不保序+③全解释）+ benchmark + evaluator + 搜索轴诚实负结果；不报告 LLM 独特性，不换链挑阳性。
+- 协作纪律生效案例：readiness v2 签发 → 判定 → thread.12c 里程碑汇报，全程 send_peer 带 expect_id。

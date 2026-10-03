@@ -1,0 +1,12 @@
+read_liberty -lib ../cells.lib
+read_verilog -sv design.v
+hierarchy -check -top top
+synth -top top -flatten -noabc
+dffunmap
+dfflibmap -liberty ../cells.lib
+abc -exe "/opt/homebrew/Cellar/yosys/0.69/bin/yosys-abc" -liberty ../cells.lib
+clean
+delete t:$scopeinfo
+check -mapped -assert
+tee -o stat.json stat -json -liberty ../cells.lib -top top
+write_json mapped.json

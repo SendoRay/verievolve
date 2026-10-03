@@ -315,3 +315,39 @@ Gate B（`results.json::gate_b`）通过：top-1/3/5 regret 全为 0，true-best
 完整解释，属于经典线性物理。不得声称新误差理论，也没有证据要求用④解释本批数据。③在工程容差内可称
 validated approximation / ranking surrogate，不称 full-chain 精确恒等。当前仍无 decision witness；下一步若做
 搜索，贡献只能检验“自动装配结构特异链级 fitness + 开放结构搜索”是否得到 S1，不能把本轮机制反转写成设计损失。
+
+### 8.10 formal S 重跑启动（readiness v2 轮换）
+
+按 `FORMAL_BACKEND_ERRATUM_v1` 的重跑纪律执行：修订实现的就绪复核换用
+`refine-logs/FORMAL_S_READY_v2.json`（pin 当前源码 digest `c43b6046…`、协议 sha `b6766909…`
+与中止 run 一致、当前源码全量测试 848 passed 记录
+`refine-logs/FORMAL_TESTS_20261003_104111.json`）。差异复核（834d449→ffe76b5）确认
+`protocol_spec()` 零改动，formal_run/validate_main 修订仅历史源码对账走新增
+`search_ir/provenance.py`。
+
+登记一次执行偏差：首次 launch（`formal-necessary-v2-20261003`）在 `_ready` 处立即失败——
+签发的 readiness JSON 漏写机器校验字段 `status:"reviewed"`（KeyError），无任何实验副作用；
+失败 `.launch` 现场保留未删，文件修复后 amend 提交（5b5c3c6）。正式重跑为
+`formal-necessary-v2-20261003b`（5 seeds × {joint, staged} × B=32 = 320 attempts，条件性
+cost-first 160），按冻结 `FORMAL_S_PROTOCOL_v1` 原样执行；旧 formal-v1 产物保留，不拼接、
+不判 S0。
+
+### 8.11 formal S 判定：`formal-necessary-v2-20261003b` → S0
+
+冻结协议 `FORMAL_S_PROTOCOL_v1`（sha `b6766909…`，与中止 run 一致）完整执行：320/320 attempts
+全部计费（229 ok / 74 invalid_proposal / 15 saturation_failed / 2 candidate_timeout），墙钟
+25472.6 s（7.08 h，stage1 12 h 限制内）。主 archive 锁定后 held-out 终考 49 个唯一候选；
+十个 seed/arm collection 合计 60 条成员记录（跨 collection 的重复候选只评价一次）。
+`stage1_decision.json` 判定：
+
+- joint−staged HV 差的配对 bootstrap 95% CI = [−0.0196, +0.0418]（mean +0.0084，n=5），下界
+  未 > 0；
+- 工程命中 seed 数 2/5（要求 ≥3）：seed 101 joint 面积 34207.068 vs staged 36968.148
+  μm²（省 2761.08，> ε_A=383.46），seed 307 省 805.45 μm²；seed 211/401/503 无命中且
+  HV 差为负（−0.032/−0.013/−0.008）；
+- `necessary_pass=false` → 按预注册 stop rule 判 **S0**，`cost_first=not-run
+  -preregistered-necessary-condition-failed`，L/D 记 N/A。
+
+产物：`experiments_search/formal_s/formal-necessary-v2-20261003b/`（manifest、ledger、
+archive_lock、heldout_results、stage1_decision、results.json）。协议未改、判据未动、旧
+formal-v1 inconclusive 产物继续保留；未运行 LLM，未换链。
