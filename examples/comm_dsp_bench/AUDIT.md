@@ -400,3 +400,29 @@ held-out 数字只作评价器诊断，不得进入论文结论。修复只对 w
 模数下的有符号代表，不改变候选池、场景、阈值或判据。13,312 点近满量程长序列新增为强制回归，
 四个 `(R,N)` 组合在确实发生内部 wrap 时仍须逐样本等于等价 FIR。勘误与完整重跑纪律见
 `thesis/CIC_BACKEND_ERRATUM_v1.md`；后续只允许 execution-v3 + 新 run-id 完整重跑。
+
+### 8.15 CIC witness 正式判定：局部模型漏掉溢出语义，跨链机制成立
+
+勘误后 run `formal-cic-witness-v1-20261008b` 使用 execution-v3 从头执行，完成 main 414、held-out
+276、stress 138 条候选—场景评价，`results.json::status=formal_completed`。三路参考逐场景一致，
+main 判定先于 held-out 落盘；候选、场景、阈值与判据均未改变。正式来源为
+`experiments_system/cic_witness_v1/runs/formal-cic-witness-v1-20261008b/results.json` 和
+`main_decision.json`。
+
+预注册的四个 H/O 对照全部成立。每对只有内部溢出语义不同：H 为 wrap，O 为 sat；三个局部指标
+完全相同。main worst Q（H → O）分别为：R2N3 `0 → 56616.64247894016`，R2N4
+`0 → 21106.18463082435`，R4N3 `3.5356953663954153e-9 → 869.7067711082964`，R4N4
+`4.2499433112244e-9 → 205627.96028605575`。全部差值远超冻结的
+`epsilon_Q=2.32929922807541e-6`，因此每对在 Hogenauer predicted SNR、worst-stage SQNR 和累计裁剪
+三项上均构成 collapse。Hogenauer predicted SNR 还记录 R2 12、R4 14 个 strict reversal；这些 strict
+reversal 全部由局部模型误把 sat 候选排在正常 wrap/裁剪候选之前造成。
+
+held-out 的四对方向全部保持：H worst Q 为 `0, 0, 3.4997375685537106e-9,
+4.2567449974052745e-9`，对应 O 为 `63809.936233343666, 7814.1278615150595,
+187023.69054304034, 201.75903337464936`。机制计数也与归因一致：main 中四个 H 候选发生大量内部
+wrap 但 `output_sat=0`，说明模运算在梳状器中自愈；四个 O 候选发生内部 sat 并出现输出饱和。
+
+本 gate 的结论限定为：在冻结的 CIC 场景网格上，只预测低位截断方差而忽略高位 wrap/sat 语义的
+局部指标不保序；DDC 中“局部信息不足”的机制可以迁移到带递归状态的第二条链，但具体原因变为
+CIC 模自愈被 saturation 破坏。它不是搜索或 LLM 结果，不推翻 formal S 的 S0，也不能从一个确定性
+候选池外推统计显著性。
