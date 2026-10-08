@@ -1,0 +1,165 @@
+{
+  "status": "development_only",
+  "created_utc": "2026-10-08T05:16:57.495074+00:00",
+  "provider": "claude_code",
+  "model": "claude-haiku-4-5-20251001",
+  "max_attempts": 2,
+  "formula_request": {
+    "schema_version": "verievolve-formula-request-v1",
+    "formula_id": "ddc-baseband-v1",
+    "inputs": {
+      "x": {
+        "kind": "stream",
+        "value": {
+          "kind": "complex",
+          "component": {
+            "kind": "fixed",
+            "signed": true,
+            "width": 12,
+            "frac": 11
+          }
+        },
+        "rate": {
+          "num": 1,
+          "den": 1
+        }
+      },
+      "fcw": {
+        "kind": "unsigned_integer",
+        "width": 32
+      }
+    },
+    "nodes": [
+      {
+        "id": "phase",
+        "op": "phase_accumulate",
+        "inputs": [
+          "fcw"
+        ],
+        "expression": "phi[n+1]=(phi[n]+fcw) mod 2^32",
+        "parameters": {
+          "state_width": 32
+        }
+      },
+      {
+        "id": "phasor",
+        "op": "complex_exp",
+        "inputs": [
+          "phase"
+        ],
+        "expression": "p[n]=exp(-j*2*pi*phi[n]/2^32)",
+        "parameters": {}
+      },
+      {
+        "id": "mixed",
+        "op": "complex_multiply",
+        "inputs": [
+          "x",
+          "phasor"
+        ],
+        "expression": "u[n]=x[n]*p[n]",
+        "parameters": {}
+      },
+      {
+        "id": "filtered",
+        "op": "fir",
+        "inputs": [
+          "mixed"
+        ],
+        "expression": "v[n]=sum(k=0..32,h[k]*u[n-k])",
+        "parameters": {
+          "coefficients_id": "ddc-v1-h33"
+        }
+      },
+      {
+        "id": "y",
+        "op": "decimate",
+        "inputs": [
+          "filtered"
+        ],
+        "expression": "y[m]=v[2*m]",
+        "parameters": {
+          "factor": 2
+        }
+      }
+    ],
+    "output": {
+      "node": "y",
+      "type": {
+        "kind": "stream",
+        "value": {
+          "kind": "complex",
+          "component": {
+            "kind": "fixed",
+            "signed": true,
+            "width": 16,
+            "frac": 15
+          }
+        },
+        "rate": {
+          "num": 1,
+          "den": 2
+        }
+      }
+    },
+    "requirements": {
+      "quality": {
+        "metric": "aligned_impl_nmse",
+        "maximum": 2.32929922807541e-05,
+        "evaluation_scope": "frozen-ddc-chain"
+      },
+      "cost": {
+        "metric": "synthesis_area",
+        "backend": "nangate45"
+      },
+      "objectives": [
+        "minimize_quality_error",
+        "minimize_area"
+      ]
+    }
+  },
+  "result": {
+    "status": "exhausted",
+    "formula_sha256": "384b0adc52ddc237930bf62647a85c2bac9395732dbe9be71d0635f9cd7070dc",
+    "attempt_count": 2,
+    "failed_attempts": 2,
+    "last_error": {
+      "code": "llm_response_error",
+      "path": "$llm_response",
+      "message": "TimeoutError: Claude CLI subprocess timed out",
+      "detail": null
+    },
+    "transcript": [
+      {
+        "attempt": 1,
+        "prompt": "Produce one complete architecture plan for this request.\nThe top-level object must contain exactly: schema_version, formula_sha256, kind, nco, filter_decimator; rationale is optional.\nkind must be ddc-architecture-plan. Copy formula_sha256 exactly.\nUse the strategy-specific fields shown by the capability grammar.\nMachine context:\n{\n  \"attempt\": 1,\n  \"capabilities\": {\n    \"arbitrary_rtl_allowed\": false,\n    \"architecture_plan_schema\": \"verievolve-architecture-plan-v1\",\n    \"filter_numeric_domains\": {\n      \"accumulator_bits\": [\n        0,\n        20,\n        21,\n        22,\n        23,\n        24,\n        25,\n        26,\n        27,\n        28,\n        29,\n        30,\n        31,\n        32,\n        33,\n        34,\n        35,\n        36,\n        37,\n        38,\n        39,\n        40,\n        41,\n        42,\n        43,\n        44,\n        45,\n        46,\n        47,\n        48\n      ],\n      \"coefficient_bits\": {\n        \"maximum\": 24,\n        \"minimum\": 8\n      },\n      \"product_drop\": {\n        \"maximum\": 8,\n        \"minimum\": 0\n      },\n      \"rounding\": [\n        \"rne\",\n        \"trunc\"\n      ]\n    },\n    \"filter_strategies\": [\n      \"direct_symmetric\",\n      \"polyphase\"\n    ],\n    \"nco_strategies\": {\n      \"coarse_residual\": {\n        \"coarse\": \"lut\",\n        \"product_rounding\": [\n          \"rne\",\n          \"trunc\"\n        ],\n        \"residual\": \"cordic\",\n        \"split_bits\": {\n          \"maximum\": 14,\n          \"minimum\": 2\n        }\n      },\n      \"cordic\": {\n        \"phase_bits\": {\n          \"maximum\": 16,\n          \"minimum\": 8\n        },\n        \"stages\": {\n          \"maximum\": 20,\n          \"minimum\": 7\n        }\n      },\n      \"lut\": {\n        \"depth\": [\n          64,\n          128,\n          256,\n          512,\n          1024\n        ],\n        \"interpolation\": [\n          \"nearest\",\n          \"linear\",\n          \"quad\"\n        ],\n        \"phase_bits\": {\n          \"maximum\": 16,\n          \"minimum\": 8\n        }\n      }\n    },\n    \"unknown_fields_allowed\": false\n  },\n  \"formula_request\": {\n    \"formula_id\": \"ddc-baseband-v1\",\n    \"inputs\": {\n      \"fcw\": {\n        \"kind\": \"unsigned_integer\",\n        \"width\": 32\n      },\n      \"x\": {\n        \"kind\": \"stream\",\n        \"rate\": {\n          \"den\": 1,\n          \"num\": 1\n        },\n        \"value\": {\n          \"component\": {\n            \"frac\": 11,\n            \"kind\": \"fixed\",\n            \"signed\": true,\n            \"width\": 12\n          },\n          \"kind\": \"complex\"\n        }\n      }\n    },\n    \"nodes\": [\n      {\n        \"expression\": \"phi[n+1]=(phi[n]+fcw) mod 2^32\",\n        \"id\": \"phase\",\n        \"inputs\": [\n          \"fcw\"\n        ],\n        \"op\": \"phase_accumulate\",\n        \"parameters\": {\n          \"state_width\": 32\n        }\n      },\n      {\n        \"expression\": \"p[n]=exp(-j*2*pi*phi[n]/2^32)\",\n        \"id\": \"phasor\",\n        \"inputs\": [\n          \"phase\"\n        ],\n        \"op\": \"complex_exp\",\n        \"parameters\": {}\n      },\n      {\n        \"expression\": \"u[n]=x[n]*p[n]\",\n        \"id\": \"mixed\",\n        \"inputs\": [\n          \"x\",\n          \"phasor\"\n        ],\n        \"op\": \"complex_multiply\",\n        \"parameters\": {}\n      },\n      {\n        \"expression\": \"v[n]=sum(k=0..32,h[k]*u[n-k])\",\n        \"id\": \"filtered\",\n        \"inputs\": [\n          \"mixed\"\n        ],\n        \"op\": \"fir\",\n        \"parameters\": {\n          \"coefficients_id\": \"ddc-v1-h33\"\n        }\n      },\n      {\n        \"expression\": \"y[m]=v[2*m]\",\n        \"id\": \"y\",\n        \"inputs\": [\n          \"filtered\"\n        ],\n        \"op\": \"decimate\",\n        \"parameters\": {\n          \"factor\": 2\n        }\n      }\n    ],\n    \"output\": {\n      \"node\": \"y\",\n      \"type\": {\n        \"kind\": \"stream\",\n        \"rate\": {\n          \"den\": 2,\n          \"num\": 1\n        },\n        \"value\": {\n          \"component\": {\n            \"frac\": 15,\n            \"kind\": \"fixed\",\n            \"signed\": true,\n            \"width\": 16\n          },\n          \"kind\": \"complex\"\n        }\n      }\n    },\n    \"requirements\": {\n      \"cost\": {\n        \"backend\": \"nangate45\",\n        \"metric\": \"synthesis_area\"\n      },\n      \"objectives\": [\n        \"minimize_quality_error\",\n        \"minimize_area\"\n      ],\n      \"quality\": {\n        \"evaluation_scope\": \"frozen-ddc-chain\",\n        \"maximum\": 2.32929922807541e-05,\n        \"metric\": \"aligned_impl_nmse\"\n      }\n    },\n    \"schema_version\": \"verievolve-formula-request-v1\"\n  },\n  \"formula_sha256\": \"384b0adc52ddc237930bf62647a85c2bac9395732dbe9be71d0635f9cd7070dc\",\n  \"previous_feedback\": null,\n  \"response_rule\": \"return exactly one JSON architecture-plan object\",\n  \"task\": \"produce-one-complete-architecture-plan\"\n}",
+        "raw_response": "API Error: Unable to connect to API (EPERM)",
+        "proposal": null,
+        "result": {
+          "status": "rejected",
+          "error": {
+            "code": "llm_response_error",
+            "path": "$llm_response",
+            "message": "ValueError: response must contain only one JSON object",
+            "detail": null
+          }
+        }
+      },
+      {
+        "attempt": 2,
+        "prompt": "Produce one complete architecture plan for this request.\nThe top-level object must contain exactly: schema_version, formula_sha256, kind, nco, filter_decimator; rationale is optional.\nkind must be ddc-architecture-plan. Copy formula_sha256 exactly.\nUse the strategy-specific fields shown by the capability grammar.\nMachine context:\n{\n  \"attempt\": 2,\n  \"capabilities\": {\n    \"arbitrary_rtl_allowed\": false,\n    \"architecture_plan_schema\": \"verievolve-architecture-plan-v1\",\n    \"filter_numeric_domains\": {\n      \"accumulator_bits\": [\n        0,\n        20,\n        21,\n        22,\n        23,\n        24,\n        25,\n        26,\n        27,\n        28,\n        29,\n        30,\n        31,\n        32,\n        33,\n        34,\n        35,\n        36,\n        37,\n        38,\n        39,\n        40,\n        41,\n        42,\n        43,\n        44,\n        45,\n        46,\n        47,\n        48\n      ],\n      \"coefficient_bits\": {\n        \"maximum\": 24,\n        \"minimum\": 8\n      },\n      \"product_drop\": {\n        \"maximum\": 8,\n        \"minimum\": 0\n      },\n      \"rounding\": [\n        \"rne\",\n        \"trunc\"\n      ]\n    },\n    \"filter_strategies\": [\n      \"direct_symmetric\",\n      \"polyphase\"\n    ],\n    \"nco_strategies\": {\n      \"coarse_residual\": {\n        \"coarse\": \"lut\",\n        \"product_rounding\": [\n          \"rne\",\n          \"trunc\"\n        ],\n        \"residual\": \"cordic\",\n        \"split_bits\": {\n          \"maximum\": 14,\n          \"minimum\": 2\n        }\n      },\n      \"cordic\": {\n        \"phase_bits\": {\n          \"maximum\": 16,\n          \"minimum\": 8\n        },\n        \"stages\": {\n          \"maximum\": 20,\n          \"minimum\": 7\n        }\n      },\n      \"lut\": {\n        \"depth\": [\n          64,\n          128,\n          256,\n          512,\n          1024\n        ],\n        \"interpolation\": [\n          \"nearest\",\n          \"linear\",\n          \"quad\"\n        ],\n        \"phase_bits\": {\n          \"maximum\": 16,\n          \"minimum\": 8\n        }\n      }\n    },\n    \"unknown_fields_allowed\": false\n  },\n  \"formula_request\": {\n    \"formula_id\": \"ddc-baseband-v1\",\n    \"inputs\": {\n      \"fcw\": {\n        \"kind\": \"unsigned_integer\",\n        \"width\": 32\n      },\n      \"x\": {\n        \"kind\": \"stream\",\n        \"rate\": {\n          \"den\": 1,\n          \"num\": 1\n        },\n        \"value\": {\n          \"component\": {\n            \"frac\": 11,\n            \"kind\": \"fixed\",\n            \"signed\": true,\n            \"width\": 12\n          },\n          \"kind\": \"complex\"\n        }\n      }\n    },\n    \"nodes\": [\n      {\n        \"expression\": \"phi[n+1]=(phi[n]+fcw) mod 2^32\",\n        \"id\": \"phase\",\n        \"inputs\": [\n          \"fcw\"\n        ],\n        \"op\": \"phase_accumulate\",\n        \"parameters\": {\n          \"state_width\": 32\n        }\n      },\n      {\n        \"expression\": \"p[n]=exp(-j*2*pi*phi[n]/2^32)\",\n        \"id\": \"phasor\",\n        \"inputs\": [\n          \"phase\"\n        ],\n        \"op\": \"complex_exp\",\n        \"parameters\": {}\n      },\n      {\n        \"expression\": \"u[n]=x[n]*p[n]\",\n        \"id\": \"mixed\",\n        \"inputs\": [\n          \"x\",\n          \"phasor\"\n        ],\n        \"op\": \"complex_multiply\",\n        \"parameters\": {}\n      },\n      {\n        \"expression\": \"v[n]=sum(k=0..32,h[k]*u[n-k])\",\n        \"id\": \"filtered\",\n        \"inputs\": [\n          \"mixed\"\n        ],\n        \"op\": \"fir\",\n        \"parameters\": {\n          \"coefficients_id\": \"ddc-v1-h33\"\n        }\n      },\n      {\n        \"expression\": \"y[m]=v[2*m]\",\n        \"id\": \"y\",\n        \"inputs\": [\n          \"filtered\"\n        ],\n        \"op\": \"decimate\",\n        \"parameters\": {\n          \"factor\": 2\n        }\n      }\n    ],\n    \"output\": {\n      \"node\": \"y\",\n      \"type\": {\n        \"kind\": \"stream\",\n        \"rate\": {\n          \"den\": 2,\n          \"num\": 1\n        },\n        \"value\": {\n          \"component\": {\n            \"frac\": 15,\n            \"kind\": \"fixed\",\n            \"signed\": true,\n            \"width\": 16\n          },\n          \"kind\": \"complex\"\n        }\n      }\n    },\n    \"requirements\": {\n      \"cost\": {\n        \"backend\": \"nangate45\",\n        \"metric\": \"synthesis_area\"\n      },\n      \"objectives\": [\n        \"minimize_quality_error\",\n        \"minimize_area\"\n      ],\n      \"quality\": {\n        \"evaluation_scope\": \"frozen-ddc-chain\",\n        \"maximum\": 2.32929922807541e-05,\n        \"metric\": \"aligned_impl_nmse\"\n      }\n    },\n    \"schema_version\": \"verievolve-formula-request-v1\"\n  },\n  \"formula_sha256\": \"384b0adc52ddc237930bf62647a85c2bac9395732dbe9be71d0635f9cd7070dc\",\n  \"previous_feedback\": {\n    \"code\": \"llm_response_error\",\n    \"detail\": null,\n    \"message\": \"ValueError: response must contain only one JSON object\",\n    \"path\": \"$llm_response\"\n  },\n  \"response_rule\": \"return exactly one JSON architecture-plan object\",\n  \"task\": \"produce-one-complete-architecture-plan\"\n}",
+        "raw_response": null,
+        "proposal": null,
+        "result": {
+          "status": "rejected",
+          "error": {
+            "code": "llm_response_error",
+            "path": "$llm_response",
+            "message": "TimeoutError: Claude CLI subprocess timed out",
+            "detail": null
+          }
+        }
+      }
+    ]
+  }
+}

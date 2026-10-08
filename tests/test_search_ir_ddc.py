@@ -11,9 +11,12 @@ BENCH = Path(__file__).resolve().parents[1] / "examples" / "comm_dsp_bench"
 sys.path.insert(0, str(BENCH))
 
 from search_ir import (
+    architecture_plan,
     candidate_hash,
+    compile_architecture_plan,
     cordic_sincos,
     ddc_candidate,
+    ddc_formula_request,
     direct_symmetric_fir,
     emulate_ddc_candidate,
     lower_ddc_rtl,
@@ -30,6 +33,47 @@ def _literal(width, value):
 
 
 def _candidates():
+    formula = ddc_formula_request()
+    plans = [
+        architecture_plan(
+            formula,
+            nco={
+                "strategy": "coarse_residual",
+                "split_bits": 8,
+                "product_rounding": "rne",
+                "coarse": {
+                    "strategy": "lut",
+                    "depth": 128,
+                    "interpolation": "nearest",
+                    "phase_bits": 10,
+                },
+                "residual": {
+                    "strategy": "cordic",
+                    "stages": 7,
+                    "phase_bits": 16,
+                },
+            },
+            filter_decimator={
+                "strategy": "polyphase",
+                "coefficient_bits": 14,
+                "product_drop": 1,
+                "accumulator_bits": 28,
+                "rounding": "rne",
+            },
+        ),
+        architecture_plan(
+            formula,
+            nco={"strategy": "cordic", "stages": 16, "phase_bits": 16},
+            filter_decimator={
+                "strategy": "direct_symmetric",
+                "coefficient_bits": 16,
+                "product_drop": 0,
+                "accumulator_bits": 32,
+                "rounding": "rne",
+            },
+        ),
+    ]
+    planned = [compile_architecture_plan(formula, plan)["candidate"] for plan in plans]
     existing = [
         ddc_candidate(
             lut_sincos(256, "linear", 12), direct_symmetric_fir(12)
@@ -43,10 +87,11 @@ def _candidates():
             polyphase_decimator(12, product_drop=2, accumulator_bits=24),
         ),
     ]
-    # 保留历史两配置，再加入三份公共 fixture；按结构身份避免重复执行。
+    # 保留历史配置与公共 fixture，并直接验证 Formula→Plan 路径的产物。
+    # 按结构身份去重，避免为同一硬件重复跑仿真与综合。
     by_hash = {
         candidate_hash(candidate): candidate
-        for candidate in [*existing, *development_candidates()]
+        for candidate in [*existing, *development_candidates(), *planned]
     }
     return list(by_hash.values())
 

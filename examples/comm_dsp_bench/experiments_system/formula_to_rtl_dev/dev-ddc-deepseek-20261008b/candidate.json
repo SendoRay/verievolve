@@ -1,0 +1,108 @@
+{
+  "schema_version": "verievolve-search-ir-v1",
+  "formula_version": "ddc-formula-v1",
+  "contract_version": "CONTRACT_DDC_v1",
+  "kind": "ddc",
+  "adc_input": {
+    "kind": "stream",
+    "value": {
+      "kind": "complex",
+      "component": {
+        "kind": "fixed",
+        "signed": true,
+        "width": 12,
+        "frac": 11
+      }
+    },
+    "rate": {
+      "num": 1,
+      "den": 1
+    }
+  },
+  "phase_accumulator": {
+    "kind": "phase_accumulator",
+    "width": 32
+  },
+  "nco": {
+    "kind": "cordic_sincos",
+    "mode": "rotation",
+    "stages": 16,
+    "phase_bits": 16,
+    "output": {
+      "kind": "complex",
+      "component": {
+        "kind": "fixed",
+        "signed": true,
+        "width": 16,
+        "frac": 15
+      }
+    }
+  },
+  "mixer": {
+    "kind": "complex_multiply",
+    "product_drop": 0,
+    "rounding": "rne",
+    "saturation": "sat",
+    "output": {
+      "kind": "stream",
+      "value": {
+        "kind": "complex",
+        "component": {
+          "kind": "fixed",
+          "signed": true,
+          "width": 16,
+          "frac": 15
+        }
+      },
+      "rate": {
+        "num": 1,
+        "den": 1
+      }
+    }
+  },
+  "filter_decimator": {
+    "kind": "direct_symmetric_fir_decimator",
+    "decimation": 2,
+    "coefficients_id": "ddc-v1-h33",
+    "coefficient_bits": 16,
+    "product_drop": 0,
+    "accumulator_bits": 32,
+    "rounding": "rne",
+    "saturation": "sat",
+    "input": {
+      "kind": "stream",
+      "value": {
+        "kind": "complex",
+        "component": {
+          "kind": "fixed",
+          "signed": true,
+          "width": 16,
+          "frac": 15
+        }
+      },
+      "rate": {
+        "num": 1,
+        "den": 1
+      }
+    },
+    "output": {
+      "kind": "stream",
+      "value": {
+        "kind": "complex",
+        "component": {
+          "kind": "fixed",
+          "signed": true,
+          "width": 16,
+          "frac": 15
+        }
+      },
+      "rate": {
+        "num": 1,
+        "den": 2
+      }
+    }
+  },
+  "metadata": {
+    "label": "formula-plan:1e0649622e18"
+  }
+}
