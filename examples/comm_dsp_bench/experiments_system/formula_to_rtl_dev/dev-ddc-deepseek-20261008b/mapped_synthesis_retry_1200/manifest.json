@@ -1,0 +1,228 @@
+{
+  "binding": {
+    "scope": "formula-to-rtl-development-diagnostic-retry",
+    "candidate_hash": "6ea6a275fb7b62e8e1a75e85d557e3289cc267b11e05c1c381c2d2fe9d4f2bb8",
+    "rtl_sha256": "07db7a9403d9f23493b35e88f80033d7ddd91456bbeb6a9a9c3518e663157ff5",
+    "contract_sha256": "77e9aaf30126ebcb1d49e40ddf4580b7e9d4c60a32d8303331d7475fbd9e5985"
+  },
+  "contract": {
+    "schema_version": "search-ir-full-ddc-synthesis-v1",
+    "scope": "fixed development candidates; full-DDC mapped cell area",
+    "top": "top",
+    "flatten": true,
+    "expected_ports": {
+      "clk": [
+        "input",
+        1
+      ],
+      "rst_n": [
+        "input",
+        1
+      ],
+      "in_valid": [
+        "input",
+        1
+      ],
+      "in_ready": [
+        "output",
+        1
+      ],
+      "fcw": [
+        "input",
+        32
+      ],
+      "i_in": [
+        "input",
+        12
+      ],
+      "q_in": [
+        "input",
+        12
+      ],
+      "y_re": [
+        "output",
+        16
+      ],
+      "y_im": [
+        "output",
+        16
+      ],
+      "out_valid": [
+        "output",
+        1
+      ],
+      "out_ready": [
+        "input",
+        1
+      ]
+    },
+    "fcw": "programmable input; not constant-folded per scenario",
+    "yosys": {
+      "path": "/opt/homebrew/Cellar/yosys/0.69/bin/yosys",
+      "sha256": "96438a5f42fae3b9514e4d4efeb4934de146f57d19277c5176e74a5b37f5d965",
+      "version": "Yosys 0.69+post (git sha1 143eb14f9cc55d6f8927e68523b0c9d2166ed02c, Release, AppleClang clang++ 17.0.0.17000604)"
+    },
+    "abc": {
+      "path": "/opt/homebrew/Cellar/yosys/0.69/bin/yosys-abc",
+      "sha256": "d7f43946a2e5b469844dae61f9287eda6390f053f2b03e4492b7f40cbd5e72ea",
+      "version": "======== ABC command line \"version\"\nUC Berkeley, ABC 1.01 (compiled Sep  9 2026 05:28:12)"
+    },
+    "liberty": {
+      "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/pdk/NangateOpenCellLibrary_typical.lib",
+      "sha256": "8d540a4d4cf6d09d27c87ad067857a9c0c2eeb023ab7a56e058cd3113db4e9b1"
+    },
+    "corner": "Nangate45 typical, 1.1V, 25C",
+    "area_unit": "um^2",
+    "script": "read_liberty -lib ../cells.lib\nread_verilog -sv design.v\nhierarchy -check -top top\nsynth -top top -flatten -noabc\ndffunmap\ndfflibmap -liberty ../cells.lib\nabc -exe \"/opt/homebrew/Cellar/yosys/0.69/bin/yosys-abc\" -liberty ../cells.lib\nclean\ndelete t:$scopeinfo\ncheck -mapped -assert\ntee -o stat.json stat -json -liberty ../cells.lib -top top\nwrite_json mapped.json\n",
+    "script_sha256": "457b44e8f723f91bf7a0e143406b91fd7c41aad611a54d2caf35e045fd70ab37",
+    "sources": [
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/certfit/tpl_cordic.py",
+        "sha256": "faa0d2e79f688c719f1a0104da09947c7dbf535ffa7c2b22a3ca70cd22083675"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/candidates.py",
+        "sha256": "0f250632f8409664dc0b83367825a258c79060c49ec5497c32ec9d748ea88e99"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/fixed_chain.py",
+        "sha256": "ef046f08d78ed05abff94be3c8c506887d9316fc5ed5329d2a5df944d7ff35f6"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/ref_chain.py",
+        "sha256": "4984a9bc6e47d10d97e78d09639be973ec3d369a1212b84240769d96439020bf"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/rtl_gen.py",
+        "sha256": "effcfc19962250cf505c54ab292cfa3f2a11f86d313692a1bc710c4a2695c2a4"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/scenarios.py",
+        "sha256": "aad25be9278ae8e4fe05be07aed0c4479edab598c640f233750095ec9c168fa1"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/chains/ddc/spec.py",
+        "sha256": "790f07ad9c9ecb6a6ed76f5f34d335f78293f55f71f8721fd4a60c382ddf10c6"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/design_gen.py",
+        "sha256": "2fa27771edcbf1fa9bc724ef49314bcf0304abd0483328a54840fd3ef8603116"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/__init__.py",
+        "sha256": "7d362effb694c18a3393287770de9d58a534b6db129a6bb4f712709f37339134"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/actions.py",
+        "sha256": "ff5d829d064748af289ab5c213790425b53b356082c189891fd454acddc691a0"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/architecture_plan.py",
+        "sha256": "957126ab23f8ce45de216493ba2afe0dd4fb81bba2de7c224282179b01c12dea"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/canonicalize.py",
+        "sha256": "2eef0f80c68a83fc8553428eb4d6d35a3354ae7e93a636740c0d81cedcfcaa37"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/dev_fixtures.py",
+        "sha256": "02bc80c0cd9d13ab0e668051cf5878802b636ff99fb96b6d05fac183ec0364dc"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/dev_run.py",
+        "sha256": "9a83bd019f49179a7315df40722f579f6463336be2549242a5d2f4e32e991632"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/evaluate.py",
+        "sha256": "d259f5cf2d356cd34d1863eab249027e8442e773e0a93ae0685a9f38f8cbb19d"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/formal_run.py",
+        "sha256": "acc12c2aa730e627091957b575e354e16ddac01a2e0ad7809ab8517ef37d8174"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/formal_state.py",
+        "sha256": "c57187e0762eacf8bb23288755cacdbd1cd684172d2fdf290cfdd1ff3f33b4a7"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/formula_contract.py",
+        "sha256": "5c40ad45f3343f6d55b4da1be1c3ed33a33b37f2812c79e1e982138fd43e3d63"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/frontier.py",
+        "sha256": "d4945bfcad0d75549465f28b6e44f184ce22b4630d5a4f974e1905d589e3b0f0"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/llm_planner.py",
+        "sha256": "141dd3c12bf15fd49f1c65bb63b382f2bb35b18e189d0aa932b2050a6c84806f"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_bittrue.py",
+        "sha256": "17ac4819914858683022506a5765027077a1487c87c8e7744cd17d51baf46113"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/lower_rtl.py",
+        "sha256": "55458b39c710587ce0a0a934e0b397ed040b425b8e6fcf0af1fea0b9fae7637d"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/pilot.py",
+        "sha256": "d686c8a2a5f9ac26388b6d14f7d58f5dff2d05060f8ffbddbfdacedac31936aa"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/planning_loop.py",
+        "sha256": "8e138e11064c21832d1532bace68d2b7e82a060bcbea0f1712d5160e1e6e840b"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/proposal_contract.py",
+        "sha256": "a44641e3a04190610b45d438ec437f6b5e45d19454e93f7e7555b4f19d76b3b6"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/provenance.py",
+        "sha256": "4f34dfde98cd823dbfac1efbcdacfb383cc85befb6105a8cc8b36fe0238333c1"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/rtl_verify.py",
+        "sha256": "a5eeaba2e459d9787d081f73ab07873ab54f04efc0355b98ef949be3d44e0ee7"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/schema.py",
+        "sha256": "900b57bff177f4bf77885f29601597fd10b3f8cb8fd30343bc434268d893bc88"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/selection.py",
+        "sha256": "9075fbb4dd3e11ab978fc4571073a39993d7b6469e162b52623566e3703468a8"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/synthesize.py",
+        "sha256": "8ff53150b35b13d0051bbaf41e5175ba719533278ea1394b58f8a6008e42c140"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/validate.py",
+        "sha256": "a9b4dac876d00b30a20053f2124187c5c62da649e09678db38b135618d696993"
+      },
+      {
+        "path": "/Users/chengzhy/verievolve/examples/comm_dsp_bench/search_ir/validate_main.py",
+        "sha256": "30d93d695648c61a7bd0de6d030c061fdf5d4c2bb8039d19d074511e98c0f80c"
+      }
+    ],
+    "environment": {
+      "python": "3.10.8 (v3.10.8:aaaf517424, Oct 11 2022, 10:14:40) [Clang 13.0.0 (clang-1300.0.29.30)]",
+      "numpy": "2.2.6",
+      "scipy": "1.15.3"
+    },
+    "sdc": null,
+    "timing_power_claims_allowed": false,
+    "microarchitecture_search": false,
+    "cache_enabled": false,
+    "resume_enabled": false,
+    "timeout_seconds": 1200,
+    "area_crosscheck": {
+      "primary": "sum of JSON top cell counts times Liberty cell areas",
+      "stat_relative_tolerance": 5e-06,
+      "stat_absolute_tolerance_um2": 1e-06,
+      "reason": "allow finite textual precision in Yosys stat, not physical variation"
+    },
+    "repeat_hash_definition": "sorted top port/cell connectivity, types and parameters; excludes instance names, source attributes and wire labels; retains Yosys signal IDs; not an equivalence proof"
+  },
+  "note": "diagnostic retry only; original 600s result preserved"
+}

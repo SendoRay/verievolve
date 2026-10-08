@@ -426,3 +426,19 @@ wrap 但 `output_sat=0`，说明模运算在梳状器中自愈；四个 O 候选
 局部指标不保序；DDC 中“局部信息不足”的机制可以迁移到带递归状态的第二条链，但具体原因变为
 CIC 模自愈被 saturation 破坏。它不是搜索或 LLM 结果，不推翻 formal S 的 S0，也不能从一个确定性
 候选池外推统计显著性。
+
+### 8.16 公式到 RTL 开发验收的综合超时复核
+
+DeepSeek 开发候选 `6ea6a275…` 已通过 bit-true/RTL 对拍和开发链级质量检查。初次 Nangate45 综合在
+固定 600 秒上限处终止；Yosys 在进入 ABC 前已完成 Verilog 解析、层次展开、寄存器映射，并报告结构
+检查 0 个问题。原始目录及 `mapped_synthesis/job/result.json` 保留不覆盖。
+
+为区分成本评价超时与设计不可映射，使用相同 RTL（sha256 `07db7a94…`）、相同 Liberty 和相同
+Yosys/ABC 脚本执行一次开发诊断重跑，只把上限延长为 1200 秒。映射在 904.3758489999454 秒完成，
+面积 41425.51 μm²、33012 个标准单元。复核记录为
+`experiments_system/formula_to_rtl_dev/dev-ddc-deepseek-20261008b/synthesis_reconciliation.json`；诊断面积
+只证明该候选可映射，不进入任何正式 LLM 优势比较。
+
+开发验收状态组合已修正：功能或质量失败仍为 `failed`；综合达到时间上限记为 `timeout`，总状态记为
+`inconclusive`，避免把未取得面积误写成候选失败。此次同时记录设计空间缺口：CORDIC 当前固定生成
+无流水组合展开，尚未把流水或迭代复用作为 typed IR 的公共微结构选择。

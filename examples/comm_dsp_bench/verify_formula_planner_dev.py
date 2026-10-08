@@ -23,6 +23,7 @@ from search_ir.evaluate import evaluate_candidate, prepare_case
 from search_ir.lower_rtl import lower_ddc_rtl
 from search_ir.rtl_verify import verify_candidate_rtl
 from search_ir import synthesize
+from search_ir.verification_status import synthesis_status, verification_status
 
 
 def _development_case():
@@ -82,8 +83,12 @@ def main() -> int:
         synthesis_root / "job", binding, contract, rtl,
         synthesize.liberty_areas((synthesis_root / "cells.lib").read_text()),
     )
+    mapped_status = synthesis_status(mapped)
+    overall_status = verification_status(
+        rtl=rtl_result["status"], quality=quality["status"], synthesis=mapped_status,
+    )
     summary = {
-        "status": "ok" if mapped["status"] == "ok" else "failed",
+        "status": overall_status,
         "scope": "development-only; no LLM advantage claim",
         "candidate_sha256": expected_hash,
         "rtl_verification": rtl_result,
@@ -92,14 +97,15 @@ def main() -> int:
             "fir_mask": quality["fir_mask"],
         },
         "synthesis": {
-            "status": mapped["status"], "area_um2": mapped["area_um2"],
+            "status": mapped_status, "area_um2": mapped["area_um2"],
             "num_cells": mapped.get("num_cells"),
+            "timed_out": mapped.get("process", {}).get("timed_out", False),
             "result_path": "mapped_synthesis/job/result.json",
         },
     }
     _write_new(run_dir / "verification.json", summary)
     print(json.dumps(summary, ensure_ascii=False))
-    return 0 if summary["status"] == "ok" else 2
+    return {"ok": 0, "inconclusive": 3, "failed": 2}[summary["status"]]
 
 
 if __name__ == "__main__":
