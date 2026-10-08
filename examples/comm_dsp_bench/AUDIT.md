@@ -373,3 +373,17 @@ manifest 同时物化每个 R 下 18 个 main、12 个 held-out、6 个 stress �
 `experiments_system/cic_witness_v1/SECOND_FREEZE_v1.json`，引用上述 manifest 与第一次冻结协议的
 SHA-256，不修改已批准的 manifest。此后允许实现参考链交叉验证并按已冻结清单计算局部指标和链级 q；
 候选、场景、阈值和判据不得重选或覆盖修改。
+
+### 8.13 CIC execution-v1 准备顺序偏差
+
+正式 runner 准备时发现累计裁剪位数这一整数指标尚未明确容差。准备命令已经写出
+`local_metrics_v1.json` 与 `execution_manifest_v1.json`，但没有计算指标排名、链级 q 或反转判定。
+由于原值落盘早于该容差获得用户确认，这两份文件只作历史诊断，不得进入正式结论，且保留不覆盖。
+
+后续须先冻结累计裁剪容差，再使用新文件名生成 execution-v2 与正式局部指标表；formal runner 只能接受
+v2 manifest。此次偏差没有读取 main、held-out 或 stress 的候选质量结果。
+
+用户随后授权执行方按默认方案确认。累计裁剪位数容差在正式链级 q 计算前冻结为 `0 bit`：只有整数位数
+完全相同才视为局部并列。签发记录为
+`experiments_system/cic_witness_v1/PRUNING_TOLERANCE_FREEZE_v1.json`。正式 runner 改为只读取
+`local_metrics_v2.json` 与 `execution_manifest_v2.json`；两个 v1 文件继续只作顺序偏差的历史诊断。
