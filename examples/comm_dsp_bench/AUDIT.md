@@ -351,3 +351,25 @@ cost-first 160），按冻结 `FORMAL_S_PROTOCOL_v1` 原样执行；旧 formal-v
 产物：`experiments_search/formal_s/formal-necessary-v2-20261003b/`（manifest、ledger、
 archive_lock、heldout_results、stage1_decision、results.json）。协议未改、判据未动、旧
 formal-v1 inconclusive 产物继续保留；未运行 LLM，未换链。
+
+### 8.12 CIC witness 第一次冻结后的预检
+
+按 `thesis/CONTRACT_CIC_WITNESS_v1.md` 第 8 节完成逐位整数模型与候选等价扫描。模型在每个
+锁存边界显式执行低位裁剪和内部 wrap/sat，I/Q 两路独立运行，并分别记录内部溢出与固定输出
+饱和。满宽 wrap 候选已与 CIC 等价 FIR 在四个 `(R,N)` 组合上逐点交叉验证。
+
+预检产物为
+`experiments_system/cic_witness_v1/preflight_manifest.json`，SHA-256 为
+`0a1bd6b725bc495a719b37e42e0a0dbfec8b1c8281bd79f657c9e35d59997d54`。28 个生成候选合并为
+23 个数值语义不同的代表：`R2N3` 的 H/U0/RND、`R2N4` 的 H/U0/RND、`R4N3` 的 H/U0
+分别构成三个重复类。R2 两组没有低位右移，因此 rne/trunc 不产生行为差异。wrap 与 sat
+在固定压力输入上产生不同位流，保持为不同候选。
+
+manifest 同时物化每个 R 下 18 个 main、12 个 held-out、6 个 stress 场景；这些场景尚未生成
+链级质量。相关 CIC 与 DDC 公共回归共 46 项通过。`formal_execution.allowed=false`，下一道门是
+用户确认该 manifest；确认前不计算局部排名、链级 q 或反转判定。
+
+用户于 2026-10-08 批准第二次冻结。签发记录为
+`experiments_system/cic_witness_v1/SECOND_FREEZE_v1.json`，引用上述 manifest 与第一次冻结协议的
+SHA-256，不修改已批准的 manifest。此后允许实现参考链交叉验证并按已冻结清单计算局部指标和链级 q；
+候选、场景、阈值和判据不得重选或覆盖修改。
