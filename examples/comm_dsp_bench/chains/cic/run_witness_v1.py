@@ -29,9 +29,11 @@ PREFLIGHT = OUT / "preflight_manifest.json"
 SECOND_FREEZE = OUT / "SECOND_FREEZE_v1.json"
 METRICS_FREEZE = OUT / "METRICS_FREEZE_v1.json"
 PRUNING_FREEZE = OUT / "PRUNING_TOLERANCE_FREEZE_v1.json"
+BACKEND_FREEZE = OUT / "BACKEND_ERRATUM_FREEZE_v1.json"
 METRICS_DOC = ROOT / "thesis/CONTRACT_CIC_METRICS_ADDENDUM_v1.md"
-LOCAL = OUT / "local_metrics_v2.json"
-EXECUTION = OUT / "execution_manifest_v2.json"
+BACKEND_ERRATUM = ROOT / "thesis/CIC_BACKEND_ERRATUM_v1.md"
+LOCAL = OUT / "local_metrics_v3.json"
+EXECUTION = OUT / "execution_manifest_v3.json"
 RUNS = OUT / "runs"
 
 
@@ -88,6 +90,15 @@ def validate_pruning_freeze() -> dict:
     return freeze
 
 
+def validate_backend_erratum() -> dict:
+    freeze = _load(BACKEND_FREEZE)
+    if freeze["status"] != "approved-for-complete-replay":
+        raise RuntimeError("CIC backend erratum is not approved for replay")
+    if _sha256(BACKEND_ERRATUM) != freeze["document"]["sha256"]:
+        raise RuntimeError("CIC backend erratum document drifted")
+    return freeze
+
+
 def _code_files() -> list[Path]:
     return [
         BENCH / "chains/cic/bittrue.py",
@@ -111,21 +122,28 @@ def _candidate_rows(preflight: dict) -> list[dict]:
 def prepare() -> dict:
     preflight, _, _ = validate_freezes()
     pruning_freeze = validate_pruning_freeze()
+    backend_freeze = validate_backend_erratum()
     missing = [str(path) for path in _code_files() if not path.is_file()]
     if missing:
         raise RuntimeError(f"missing code files: {missing}")
     candidates = _candidate_rows(preflight)
     local_rows = [metrics_v1.local_metrics(row) for row in candidates]
     local = {
-        "schema_version": "cic-local-metrics-v2",
+        "schema_version": "cic-local-metrics-v3",
         "status": "frozen before chain q",
-        "supersedes": "local_metrics_v1.json (diagnostic only)",
+        "supersedes": [
+            "local_metrics_v1.json (diagnostic only)",
+            "local_metrics_v2.json (paired with invalidated backend)",
+        ],
         "rows": local_rows,
     }
     execution = {
-        "schema_version": "cic-witness-execution-v2",
+        "schema_version": "cic-witness-execution-v3",
         "status": "approved-for-formal-execution",
-        "supersedes": "execution_manifest_v1.json (diagnostic only)",
+        "supersedes": [
+            "execution_manifest_v1.json (diagnostic only)",
+            "execution_manifest_v2.json (backend erratum requires complete replay)",
+        ],
         "preflight": {"path": str(PREFLIGHT.relative_to(BENCH)), "sha256": _sha256(PREFLIGHT)},
         "second_freeze": {"path": str(SECOND_FREEZE.relative_to(BENCH)),
                           "sha256": _sha256(SECOND_FREEZE)},
@@ -134,6 +152,14 @@ def prepare() -> dict:
         "pruning_tolerance_freeze": {
             "path": str(PRUNING_FREEZE.relative_to(BENCH)),
             "sha256": _sha256(PRUNING_FREEZE),
+        },
+        "backend_erratum_freeze": {
+            "path": str(BACKEND_FREEZE.relative_to(BENCH)),
+            "sha256": _sha256(BACKEND_FREEZE),
+        },
+        "backend_erratum_document": {
+            "path": str(BACKEND_ERRATUM.relative_to(ROOT)),
+            "sha256": _sha256(BACKEND_ERRATUM),
         },
         "metrics_document": {"path": str(METRICS_DOC.relative_to(ROOT)),
                              "sha256": _sha256(METRICS_DOC)},
@@ -166,12 +192,15 @@ def _validate_execution() -> tuple[dict, dict]:
     if execution["formal_execution_allowed"] is not True:
         raise RuntimeError("execution manifest has not been launched")
     for key in ("preflight", "second_freeze", "metrics_freeze",
-                "pruning_tolerance_freeze"):
+                "pruning_tolerance_freeze", "backend_erratum_freeze"):
         item = execution[key]
         if _sha256(BENCH / item["path"]) != item["sha256"]:
             raise RuntimeError(f"frozen input drifted: {key}")
     if _sha256(ROOT / execution["metrics_document"]["path"]) != execution["metrics_document"]["sha256"]:
         raise RuntimeError("metrics document drifted")
+    if (_sha256(ROOT / execution["backend_erratum_document"]["path"])
+            != execution["backend_erratum_document"]["sha256"]):
+        raise RuntimeError("backend erratum document drifted")
     if _sha256(BENCH / execution["local_metrics"]["path"]) != execution["local_metrics"]["sha256"]:
         raise RuntimeError("local metrics drifted")
     for rel, digest in execution["code_sha256"].items():
@@ -274,7 +303,7 @@ def truth(run_id: str) -> dict:
         raise RuntimeError(f"refuse to reuse run-id: {run_id}")
     run_dir.mkdir(parents=True)
     _write_new(run_dir / "run_manifest.json", {
-        "schema_version": "cic-witness-run-v1",
+        "schema_version": "cic-witness-run-v2",
         "run_id": run_id,
         "execution_manifest_sha256": _sha256(EXECUTION),
         "started_unix": time.time(),
@@ -304,7 +333,7 @@ def truth(run_id: str) -> dict:
         "rows": stress_rows, "aggregate": stress_agg
     })
     result = {
-        "schema_version": "cic-witness-results-v1",
+        "schema_version": "cic-witness-results-v2",
         "run_id": run_id,
         "status": "formal_completed",
         "main_decision": decision,

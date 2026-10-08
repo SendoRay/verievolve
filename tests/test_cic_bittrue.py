@@ -56,6 +56,20 @@ def test_full_width_wrap_matches_equivalent_fir_for_all_contract_combos():
         assert got == expected, (R, N)
 
 
+def test_full_width_wrap_self_heals_on_long_near_full_scale_stream():
+    rng = np.random.default_rng(20261008)
+    x = rng.integers(-2048, 2048, size=13_312, dtype=np.int64)
+    for R, N in ((2, 3), (2, 4), (4, 3), (4, 4)):
+        row = _candidate(f"comp_U0_R{R}N{N}")
+        got, events = CICBitTrue(row).run(x.tolist())
+        causal = np.convolve(x, _fir_coefficients(R, N))[: len(x)]
+        exact = causal[::R]
+        expected = [_sat16(round_shift(int(v), row["B_fmt"], "rne"))
+                    for v in exact]
+        assert sum(events["internal_wrap_event"]) > 0
+        assert got == expected, (R, N)
+
+
 def test_wrap_and_sat_are_not_merged_when_internal_overflow_occurs():
     wrap = _candidate("comp_H_R2N3")
     sat = _candidate("comp_O_R2N3")

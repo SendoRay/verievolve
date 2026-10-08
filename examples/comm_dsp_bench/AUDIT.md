@@ -387,3 +387,16 @@ v2 manifest。此次偏差没有读取 main、held-out 或 stress 的候选质�
 完全相同才视为局部并列。签发记录为
 `experiments_system/cic_witness_v1/PRUNING_TOLERANCE_FREEZE_v1.json`。正式 runner 改为只读取
 `local_metrics_v2.json` 与 `execution_manifest_v2.json`；两个 v1 文件继续只作顺序偏差的历史诊断。
+
+### 8.14 CIC 首次正式运行暴露最后一级 wrap 解释缺口
+
+`formal-cic-witness-v1-20261008` 完成 414 条 main、276 条 held-out、138 条 stress 后，满宽 wrap
+基线仍出现约 80–150 的链级误差，而冻结预算仅为 `2.32929922807541e-5`。审计定位到
+`CICBitTrue.push()`：最后一级梳状器的扩展差值可能带一个整模数偏移，代码未先解释为冻结的
+`[B_(2N),B_max]` 有符号位窗口，便直接送入固定 sat16，制造了稀疏的 `-1/+1` 满幅脉冲。
+
+旧目录与结果原样保留，并增加 `INVALIDATED_BY_ERRATUM_v1.json`；其中全部排序、反转计数和
+held-out 数字只作评价器诊断，不得进入论文结论。修复只对 wrap 型候选在最终格式转换前恢复同一物理
+模数下的有符号代表，不改变候选池、场景、阈值或判据。13,312 点近满量程长序列新增为强制回归，
+四个 `(R,N)` 组合在确实发生内部 wrap 时仍须逐样本等于等价 FIR。勘误与完整重跑纪律见
+`thesis/CIC_BACKEND_ERRATUM_v1.md`；后续只允许 execution-v3 + 新 run-id 完整重跑。

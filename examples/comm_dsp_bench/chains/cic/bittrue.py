@@ -165,6 +165,14 @@ class CICBitTrue:
             else:
                 current = exact
 
+        # wrap 型 CIC 的积分器状态是在同一个物理模数 2^(B_max+1) 下传播的。
+        # 最后一级梳状器的扩展精度差值仍可能带着一个整模数偏移；在解释为
+        # [B_{2N}, B_max] 位窗口前必须先取回该窗口的有符号代表，否则固定
+        # sat16 会把本应由最后一次差分消去的模数偏移误当成真实溢出。
+        # sat 型没有模自愈性质，保留扩展差值并交给固定输出饱和。
+        if self.overflow == "wrap":
+            current = wrap_signed(current, self.W_full - current_b)
+
         d = self.B_fmt - current_b
         output = round_shift(current, d, self.rounding)
         if output < -32768 or output > 32767:

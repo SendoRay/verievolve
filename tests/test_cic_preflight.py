@@ -57,6 +57,19 @@ def test_checked_in_manifest_matches_the_builder_when_present():
         return
     checked = json.loads(path.read_text())
     fresh = prepare_witness_v1.build_preflight_manifest()
-    # git dirty 状态可因测试运行环境变化；其余内容必须逐字一致。
+    # git dirty 状态可因测试运行环境变化。
     checked["reproducibility"]["git"] = fresh["reproducibility"]["git"]
-    assert checked == fresh
+    if checked == fresh:
+        return
+    # 第二次冻结后修复最后一级 wrap 窗口解释缺口。冻结 manifest 原样保留；
+    # 允许输出 trace 指纹与相关源码指纹变化，但去重分区、候选、场景和判据必须不变。
+    erratum = ROOT / "thesis/CIC_BACKEND_ERRATUM_v1.md"
+    assert erratum.is_file()
+    for key in ("protocol", "candidate_set", "deduplicated_pool",
+                "scenario_manifest", "formal_execution"):
+        assert checked[key] == fresh[key]
+    old_classes = [(x["representative"], x["members"], x["semantic_sha256"])
+                   for x in checked["equivalence_scan"]["classes"]]
+    new_classes = [(x["representative"], x["members"], x["semantic_sha256"])
+                   for x in fresh["equivalence_scan"]["classes"]]
+    assert old_classes == new_classes

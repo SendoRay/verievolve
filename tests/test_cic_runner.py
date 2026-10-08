@@ -16,11 +16,17 @@ def test_freeze_chain_is_valid_and_candidate_pool_is_23():
     assert len(run_witness_v1._candidate_rows(preflight)) == 23
 
 
-def test_zero_bit_pruning_tolerance_is_frozen_for_v2_only():
+def test_zero_bit_pruning_tolerance_is_frozen_for_corrected_v3():
     freeze = run_witness_v1.validate_pruning_freeze()
     assert freeze["cumulative_pruning_tolerance_bits"] == 0
-    assert run_witness_v1.LOCAL.name == "local_metrics_v2.json"
-    assert run_witness_v1.EXECUTION.name == "execution_manifest_v2.json"
+    assert run_witness_v1.LOCAL.name == "local_metrics_v3.json"
+    assert run_witness_v1.EXECUTION.name == "execution_manifest_v3.json"
+
+
+def test_backend_erratum_requires_complete_replay():
+    freeze = run_witness_v1.validate_backend_erratum()
+    assert freeze["scope"]["complete_replay_required"] is True
+    assert freeze["scope"]["candidate_pool_changed"] is False
 
 
 def test_nonfinite_db_is_serialized_as_null():
