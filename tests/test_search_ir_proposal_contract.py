@@ -230,7 +230,7 @@ def test_unwrap_compose_program():
 def test_swap_fir_twice_cancels_and_preserves_numeric_fields():
     candidate = make_candidate(coefficient_bits=14)
     candidate["filter_decimator"].update(product_drop=3, accumulator_bits=28,
-                                         rounding="trunc")
+                                         rounding="floor")
     gp_tree, _ = gp_candidate(candidate, [2, 4, 0, 4, 0])
     tree = apply_program(candidate, [intent("swap_fir", "/filter_decimator"),
                                      intent("swap_fir", "/filter_decimator")])
@@ -252,7 +252,7 @@ def test_numeric_programs_match_gp_sampling_modes():
     # rounding toggle 不消耗额外抽样。
     gp_tree, _ = gp_candidate(candidate, [1, 3], phase="numeric")
     tree = apply_program(candidate, [intent("numeric",
-                                            "/filter_decimator/rounding", "trunc")])
+                                            "/filter_decimator/rounding", "floor")])
     assert tree == gp_tree
 
 
@@ -263,7 +263,7 @@ def test_numeric_programs_on_compose_candidate():
     assert tree == gp_tree
     gp_tree, _ = gp_candidate(candidate, [1, 6], phase="numeric")
     tree = apply_program(candidate, [intent("numeric",
-                                            "/nco/product_rounding", "trunc")])
+                                            "/nco/product_rounding", "floor")])
     assert tree == gp_tree
 
 
@@ -278,6 +278,23 @@ def test_value_equal_to_before_fails_without_resample(step):
         apply_program(candidate, [step])
     assert err.value.code == "apply" and err.value.index == 0
     assert candidate == snapshot
+
+
+def test_legacy_alias_to_equal_explicit_rounding_is_a_semantic_noop():
+    candidate = make_candidate()
+    candidate["filter_decimator"]["rounding"] = "rne"
+    with pytest.raises(ProposalContractError) as err:
+        apply_program(
+            candidate,
+            [
+                intent(
+                    "numeric",
+                    "/filter_decimator/rounding",
+                    "nearest_ties_to_pos_inf",
+                )
+            ],
+        )
+    assert err.value.code == "apply"
 
 
 @pytest.mark.parametrize("kind,step", [

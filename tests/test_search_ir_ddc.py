@@ -40,7 +40,7 @@ def _candidates():
             nco={
                 "strategy": "coarse_residual",
                 "split_bits": 8,
-                "product_rounding": "rne",
+                "product_rounding": "nearest_ties_to_pos_inf",
                 "coarse": {
                     "strategy": "lut",
                     "depth": 128,
@@ -58,7 +58,7 @@ def _candidates():
                 "coefficient_bits": 14,
                 "product_drop": 1,
                 "accumulator_bits": 28,
-                "rounding": "rne",
+                "rounding": "nearest_ties_to_pos_inf",
             },
         ),
         architecture_plan(
@@ -69,7 +69,7 @@ def _candidates():
                 "coefficient_bits": 16,
                 "product_drop": 0,
                 "accumulator_bits": 32,
-                "rounding": "rne",
+                "rounding": "nearest_ties_to_pos_inf",
             },
         ),
     ]

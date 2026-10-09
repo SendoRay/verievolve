@@ -1,0 +1,70 @@
+{
+  "schema_version": "hardware-system-phase-b-p0-v1",
+  "date": "2026-10-08",
+  "source_commit": "1b49a2a3fa1cf19d1c3699ef4124f3d18ba2fbd4",
+  "scope": "Phase B engineering implementation for development-quality feedback, explicit quality-limit status, and valid-ready RTL verification; no formal research experiment and no evaluator-formula correction",
+  "claim_ids": ["C2", "C4"],
+  "changes": [
+    {
+      "id": "candidate-evaluation-loop",
+      "files": [
+        "examples/comm_dsp_bench/search_ir/planning_loop.py",
+        "examples/comm_dsp_bench/search_ir/llm_planner.py",
+        "examples/comm_dsp_bench/run_formula_planner_dev.py"
+      ],
+      "result": "Rule-based and LLM proposers share an accepted/rejected/inconclusive evaluator protocol. Measured rejection feedback is retained and supplied to the next attempt; evaluator exceptions stop as inconclusive."
+    },
+    {
+      "id": "development-quality-limit",
+      "files": [
+        "examples/comm_dsp_bench/search_ir/dev_fixtures.py",
+        "examples/comm_dsp_bench/search_ir/verification_status.py",
+        "examples/comm_dsp_bench/verify_formula_planner_dev.py"
+      ],
+      "result": "Measurement success is separated from satisfaction of the explicit numerical limit. The public synthetic-tone decision is labeled development_only with deployment_acceptance=false."
+    },
+    {
+      "id": "transaction-scoreboard",
+      "files": [
+        "examples/comm_dsp_bench/search_ir/rtl_verify.py"
+      ],
+      "result": "RTL outputs are checked in accepted-transaction order without a fixed latency assumption. Input gaps, output backpressure, stalled-output stability, and a maximum-cycle progress bound are exercised."
+    }
+  ],
+  "verification": [
+    {
+      "command": "python3 -m pytest -q $(rg --files tests | rg '/test_search_ir_.*\\.py$')",
+      "exit_code": 0,
+      "observed_summary": "820 passed in 39.45s",
+      "interpretation": "All search_ir tests present in the working tree passed."
+    },
+    {
+      "command": "python3 -m py_compile examples/comm_dsp_bench/search_ir/verification_status.py examples/comm_dsp_bench/search_ir/rtl_verify.py examples/comm_dsp_bench/search_ir/planning_loop.py examples/comm_dsp_bench/search_ir/llm_planner.py examples/comm_dsp_bench/search_ir/dev_fixtures.py examples/comm_dsp_bench/run_formula_planner_dev.py examples/comm_dsp_bench/verify_formula_planner_dev.py",
+      "exit_code": 0,
+      "observed_summary": "completed without output"
+    },
+    {
+      "command": "python3 -m pytest -q tests",
+      "exit_code": 1,
+      "observed_summary": "1382 passed, 5 failed, 17 errors, 43 subtests passed in 138.49s",
+      "limitations": "The remaining failures/errors were outside the changed search_ir path and included inability to bind the optillm integration-test ports in the sandbox, missing socksio for SOCKS-proxy provider tests, and a missing DEEPSEEK_API_KEY required by configuration-validation tests. This run is not reported as a full-suite pass."
+    },
+    {
+      "command": "python3 -m pytest -q",
+      "exit_code": 2,
+      "observed_summary": "collection stopped because an unrelated example imports unavailable mlx",
+      "interpretation": "No full-repository pass claim is made."
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "observed_summary": "completed without output"
+    }
+  ],
+  "limitations": [
+    "The feedback loop currently uses one public development fixture and quality only; it does not consume synthesis area, static timing, Q_main, or held-out results.",
+    "The transaction checker is latency-independent by construction, but no alternative-latency generated implementation exists yet, so cross-microarchitecture compatibility is not yet demonstrated.",
+    "This implementation changes orchestration and verification status, not the numerical evaluator formula; AUDIT.md was therefore not changed.",
+    "No result in this record establishes that an LLM proposer outperforms a traditional search method."
+  ]
+}

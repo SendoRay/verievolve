@@ -9,6 +9,7 @@ import numpy as np
 
 from certfit import tpl_cordic
 from chains.ddc import fixed_chain, ref_chain
+from numeric_semantics import NEAREST_TIES_TO_POS_INF, round_shift
 
 from .canonicalize import candidate_hash
 from .validate import validate_candidate, validate_fir_node, validate_nco_node
@@ -71,11 +72,7 @@ def split_phase_accumulators(
 
 
 def _round_shift_15(value: np.ndarray, mode: str) -> np.ndarray:
-    if mode == "rne":
-        return (value + (1 << 14)) >> 15
-    if mode == "trunc":
-        return value >> 15
-    raise ValueError(f"unsupported product rounding {mode!r}")
+    return round_shift(value, 15, mode)
 
 
 def emulate_nco_accumulators(
@@ -238,7 +235,11 @@ def emulate_ddc_candidate(
         input_im,
         sin_code,
         cos_code,
-        {"name": "ir-fixed-mixer", "prod_drop": 0, "mode": "rne"},
+        {
+            "name": "ir-fixed-mixer",
+            "prod_drop": 0,
+            "mode": NEAREST_TIES_TO_POS_INF,
+        },
     )
     fir = emulate_fir_decimator(
         candidate["filter_decimator"], mixer["re"], mixer["im"]

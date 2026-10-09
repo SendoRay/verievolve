@@ -10,6 +10,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Mapping
 
+from numeric_semantics import NEAREST_TIES_TO_POS_INF, normalize_rounding_mode
+
 
 SCHEMA_VERSION = "verievolve-search-ir-v1"
 FORMULA_VERSION = "ddc-formula-v1"
@@ -75,7 +77,7 @@ def phasor_compose(
     coarse: Mapping[str, Any],
     residual: Mapping[str, Any],
     split_bits: int,
-    product_rounding: str = "rne",
+    product_rounding: str = NEAREST_TIES_TO_POS_INF,
 ) -> dict[str, Any]:
     """Compose coarse and residual phasors using exp(jt)=exp(jc)exp(jr).
 
@@ -88,7 +90,7 @@ def phasor_compose(
         "split_bits": int(split_bits),
         "coarse": deepcopy(dict(coarse)),
         "residual": deepcopy(dict(residual)),
-        "product_rounding": str(product_rounding),
+        "product_rounding": normalize_rounding_mode(product_rounding),
         "product_saturation": "sat",
         "output": _nco_output_type(),
     }
@@ -106,7 +108,7 @@ def _fir_common(
         "coefficient_bits": int(coefficient_bits),
         "product_drop": int(product_drop),
         "accumulator_bits": int(accumulator_bits),
-        "rounding": str(rounding),
+        "rounding": normalize_rounding_mode(rounding),
         "saturation": "sat",
         "input": stream_type(complex_format(fixed_format(16, 15)), 1, 1),
         "output": stream_type(complex_format(fixed_format(16, 15)), 1, 2),
@@ -117,7 +119,7 @@ def direct_symmetric_fir(
     coefficient_bits: int,
     product_drop: int = 0,
     accumulator_bits: int = 0,
-    rounding: str = "rne",
+    rounding: str = NEAREST_TIES_TO_POS_INF,
     coefficients_id: str = "ddc-v1-h33",
 ) -> dict[str, Any]:
     """Direct symmetric FIR followed by the contract's R=2 decimator."""
@@ -138,7 +140,7 @@ def polyphase_decimator(
     coefficient_bits: int,
     product_drop: int = 0,
     accumulator_bits: int = 0,
-    rounding: str = "rne",
+    rounding: str = NEAREST_TIES_TO_POS_INF,
     coefficients_id: str = "ddc-v1-h33",
 ) -> dict[str, Any]:
     """Two-branch polyphase FIR decimator with the same real semantics."""
@@ -174,7 +176,7 @@ def ddc_candidate(
         "mixer": {
             "kind": "complex_multiply",
             "product_drop": 0,
-            "rounding": "rne",
+            "rounding": NEAREST_TIES_TO_POS_INF,
             "saturation": "sat",
             "output": stream_type(complex_format(fixed_format(16, 15)), 1, 1),
         },

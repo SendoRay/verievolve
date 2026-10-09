@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from chains.ddc import rtl_gen
+from numeric_semantics import signed_round_shift_expression
 
 from .canonicalize import candidate_hash
 from .lower_bittrue import fir_node_config, leaf_nco_config, resolve_fir_coefficients
@@ -38,8 +39,12 @@ def _compose_nco_map_rtl(node: Mapping[str, Any]) -> str:
             )
     coarse_module = module_by_hash[candidate_hash(node["coarse"])[:12]]
     residual_module = module_by_hash[candidate_hash(node["residual"])[:12]]
-    rounding = node["product_rounding"]
-    bias = 1 << 14 if rounding == "rne" else 0
+    real_shift = signed_round_shift_expression(
+        "real_pre", 33, 15, node["product_rounding"]
+    )
+    imag_shift = signed_round_shift_expression(
+        "imag_pre", 33, 15, node["product_rounding"]
+    )
     top = f"""// Generic phasor composition from search IR
 module nco_map (
     input  wire [31:0] phase_acc,
@@ -65,8 +70,8 @@ module nco_map (
     wire signed [31:0] prod_cs = coarse_cos * residual_sin;
     wire signed [32:0] real_pre = {{prod_cc[31], prod_cc}} - {{prod_ss[31], prod_ss}};
     wire signed [32:0] imag_pre = {{prod_sc[31], prod_sc}} + {{prod_cs[31], prod_cs}};
-    wire signed [32:0] real_q = (real_pre + 33'sd{bias}) >>> 15;
-    wire signed [32:0] imag_q = (imag_pre + 33'sd{bias}) >>> 15;
+    wire signed [32:0] real_q = {real_shift};
+    wire signed [32:0] imag_q = {imag_shift};
     assign cos_o = (real_q > 32767) ? 16'sd32767 :
                    ((real_q < -32768) ? -16'sd32768 : real_q[15:0]);
     assign sin_o = (imag_q > 32767) ? 16'sd32767 :
@@ -98,11 +103,12 @@ def _drop_product_lines(
     ]
     product_drop = int(config["prod_drop"])
     if product_drop:
-        bias = 1 << (product_drop - 1) if config["mode"] == "rne" else 0
+        shifted = signed_round_shift_expression(
+            f"prod_{tag}", product_width, product_drop, config["mode"]
+        )
         lines.append(
             f"    wire signed [{product_width - 1}:0] prodq_{tag} = "
-            f"((prod_{tag} + {_signed_decimal(product_width, bias)}) >>> "
-            f"{product_drop}) <<< {product_drop};"
+            f"({shifted}) <<< {product_drop};"
         )
         return lines, f"prodq_{tag}", product_width
     return lines, f"prod_{tag}", product_width
@@ -151,11 +157,13 @@ def _finish_accumulator_lines(
             f"    wire signed [{accumulator_width - 1}:0] {saturated} = {accumulator};"
         )
     shift = int(config["wc"]) - 2
-    bias = 1 << (shift - 1) if config["mode"] == "rne" and shift else 0
+    shift_expression = signed_round_shift_expression(
+        saturated, accumulator_width, shift, config["mode"]
+    )
     shifted = f"shifted_{tag}"
     lines.append(
         f"    wire signed [{accumulator_width - 1}:0] {shifted} = "
-        f"({saturated} + {_signed_decimal(accumulator_width, bias)}) >>> {shift};"
+        f"{shift_expression};"
     )
     output = f"out_{tag}"
     lines.append(
@@ -403,6 +411,13 @@ def lower_ddc_rtl(candidate: Mapping[str, Any]) -> str:
     validate_candidate(candidate)
     nco_source = lower_nco_map_rtl(candidate["nco"])
     fir_source = lower_fir_decimator_rtl(candidate["filter_decimator"])
+    mixer_rounding = candidate["mixer"]["rounding"]
+    mix_re_shift = signed_round_shift_expression(
+        "mix_re_pre", 29, 11, mixer_rounding
+    )
+    mix_im_shift = signed_round_shift_expression(
+        "mix_im_pre", 29, 11, mixer_rounding
+    )
     top = f"""// Complete DDC generated from search IR {candidate_hash(candidate)}
 module top (
     input  wire clk,
@@ -438,8 +453,8 @@ module top (
         {{prod_ic[27], prod_ic}} + {{prod_qs[27], prod_qs}};
     wire signed [28:0] mix_im_pre =
         {{prod_qc[27], prod_qc}} - {{prod_is[27], prod_is}};
-    wire signed [28:0] mix_re_shift = (mix_re_pre + 29'sd1024) >>> 11;
-    wire signed [28:0] mix_im_shift = (mix_im_pre + 29'sd1024) >>> 11;
+    wire signed [28:0] mix_re_shift = {mix_re_shift};
+    wire signed [28:0] mix_im_shift = {mix_im_shift};
     wire signed [15:0] mix_re = (mix_re_shift > 32767) ? 16'sd32767 :
         ((mix_re_shift < -32768) ? -16'sd32768 : mix_re_shift[15:0]);
     wire signed [15:0] mix_im = (mix_im_shift > 32767) ? 16'sd32767 :

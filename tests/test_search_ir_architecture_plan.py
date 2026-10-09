@@ -28,7 +28,7 @@ def _filter(strategy="polyphase"):
         "coefficient_bits": 14,
         "product_drop": 1,
         "accumulator_bits": 28,
-        "rounding": "rne",
+        "rounding": "nearest_ties_to_pos_inf",
     }
 
 
@@ -36,7 +36,7 @@ def _hybrid_nco():
     return {
         "strategy": "coarse_residual",
         "split_bits": 8,
-        "product_rounding": "rne",
+        "product_rounding": "nearest_ties_to_pos_inf",
         "coarse": {
             "strategy": "lut", "depth": 128,
             "interpolation": "nearest", "phase_bits": 10,
@@ -77,6 +77,20 @@ def test_plan_lowering_is_deterministic_and_rationale_is_nonsemantic():
     assert plan_hash(plan) == plan_hash(changed_words)
     assert (compile_architecture_plan(formula, plan)["candidate_sha256"]
             == compile_architecture_plan(formula, changed_words)["candidate_sha256"])
+
+
+def test_legacy_rounding_inputs_are_normalized_before_new_candidates_are_built():
+    formula = ddc_formula_request()
+    plan = architecture_plan(
+        formula,
+        nco=_hybrid_nco() | {"product_rounding": "rne"},
+        filter_decimator=_filter() | {"rounding": "trunc"},
+    )
+    assert plan["nco"]["product_rounding"] == "nearest_ties_to_pos_inf"
+    assert plan["filter_decimator"]["rounding"] == "floor"
+    candidate = compile_architecture_plan(formula, plan)["candidate"]
+    assert candidate["nco"]["product_rounding"] == "nearest_ties_to_pos_inf"
+    assert candidate["filter_decimator"]["rounding"] == "floor"
 
 
 def test_formula_mismatch_is_structured_repair_feedback():

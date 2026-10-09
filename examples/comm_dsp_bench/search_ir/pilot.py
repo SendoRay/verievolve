@@ -141,23 +141,32 @@ class AreaCache:
 
 
 class ArmState:
-    def __init__(self, seed: int, arm: str):
+    def __init__(self, seed: int, arm: str, initial_candidates=None,
+                 semantic_profile: str = "current"):
         self.seed = seed
         self.arm = arm
         # 两臂以同一seed分别初始化，绝不共用可变RNG实例。
         self.rng = np.random.Generator(np.random.PCG64(seed))
+        self.initial_candidates = copy.deepcopy(
+            development_candidates() if initial_candidates is None else initial_candidates
+        )
+        if len(self.initial_candidates) != 3:
+            raise ValueError("exactly three initial candidates are required")
+        self.semantic_profile = semantic_profile
         self.population = []
         self.history = {}
         self.families = None
 
     def candidate(self, attempt: int, phase: str) -> dict:
         if attempt <= 3:
-            return {"candidate": development_candidates()[attempt - 1], "actions": [], "error": None}
+            return {"candidate": copy.deepcopy(self.initial_candidates[attempt - 1]),
+                    "actions": [], "error": None}
         family = None
         if self.arm == "staged" and self.families is not None:
             family = self.families[(attempt - 7) % len(self.families)]
         parent = tournament(self.population, self.rng, family=family)
-        result = propose(parent["candidate"], self.rng, phase)
+        result = propose(parent["candidate"], self.rng, phase,
+                         semantic_profile=self.semantic_profile)
         if (family is not None and result["candidate"] is not None
                 and family_key(result["candidate"]) != family):
             result = {**result, "candidate": None, "error": "locked structure family changed"}

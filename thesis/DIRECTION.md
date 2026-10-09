@@ -1,5 +1,7 @@
 # DIRECTION.md — 论文方向（暂定稿）
 
+> 2026-10-08 更新：当前主张、已有正负证据与系统规划见 [chengzhy/iknow.md](../chengzhy/iknow.md) §3–§7。本文保留早期论证与文献核查记录，后续实验按当前文章主线立项。
+
 - 建立日期：2026-09-28
 - 状态：**架构可冻结，新颖性措辞不可冻结**（见 §7、§8）。
   SPIRAL gate 已判**黄灯**（§5.1.6）；新颖性收窄为「structure-aware analytic bit-true fitness in

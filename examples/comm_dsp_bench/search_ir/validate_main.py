@@ -64,8 +64,8 @@ def frozen_main_definition() -> dict:
     return actual
 
 
-def verified_areas(root: Path, configs: list[dict]) -> dict:
-    """关联已有全链综合；核对已记录的依赖，不因后来新增无关文件修改历史清单。"""
+def _checked_areas(root: Path, configs: list[dict] | None) -> dict:
+    """审计冻结产物；仅在给出 configs 时允许把面积复用于当前生成路径。"""
     root = Path(root)
     manifest = json.loads((root / "manifest.json").read_text())
     result = json.loads((root / "results.json").read_text())
@@ -78,9 +78,10 @@ def verified_areas(root: Path, configs: list[dict]) -> dict:
             or contract["flatten"] is not True or contract["area_unit"] != "um^2"
             or contract["scope"] != "fixed development candidates; full-DDC mapped cell area"):
         raise EvaluationError("不匹配的全链综合口径")
-    if (contract["script"] != synthesis_script(contract["abc"]["path"])
-            or hashlib.sha256(contract["script"].encode()).hexdigest() != contract["script_sha256"]):
+    if hashlib.sha256(contract["script"].encode()).hexdigest() != contract["script_sha256"]:
         raise EvaluationError("不匹配的综合脚本")
+    if configs is not None and contract["script"] != synthesis_script(contract["abc"]["path"]):
+        raise EvaluationError("历史综合脚本不同于当前生成路径")
     try:
         for record in contract["sources"]:
             verify_source_record(record)
@@ -92,13 +93,22 @@ def verified_areas(root: Path, configs: list[dict]) -> dict:
     if _sha(root / "cells.lib") != contract["liberty"]["sha256"]:
         raise EvaluationError("面积库快照不一致")
     frozen = manifest["candidates"]
-    if len(configs) != 3 or len(frozen) != 3 or manifest["attempt_candidate_indices"] != [0, 1, 2, 0]:
+    if len(frozen) != 3 or manifest["attempt_candidate_indices"] != [0, 1, 2, 0]:
         raise EvaluationError("面积不是固定的三候选加一次重复")
-    for cfg, item in zip(configs, frozen):
-        rtl_sha = hashlib.sha256(lower_ddc_rtl(cfg).encode()).hexdigest()
-        if (candidate_hash(cfg) != item["candidate_hash"] or rtl_sha != item["rtl_sha256"]
+    if configs is not None and len(configs) != 3:
+        raise EvaluationError("面积复用要求固定的三个当前候选")
+    checked_configs = (
+        [item["candidate"] for item in frozen] if configs is None else configs
+    )
+    for cfg, item in zip(checked_configs, frozen):
+        if (candidate_hash(item["candidate"]) != item["candidate_hash"]
+                or candidate_hash(cfg) != item["candidate_hash"]
                 or canonical_json(cfg) != canonical_json(item["candidate"])):
-            raise EvaluationError("候选或实际 RTL 与已有面积身份不匹配")
+            raise EvaluationError("候选与已有面积身份不匹配")
+        if configs is not None:
+            rtl_sha = hashlib.sha256(lower_ddc_rtl(cfg).encode()).hexdigest()
+            if rtl_sha != item["rtl_sha256"]:
+                raise EvaluationError("实际 RTL 与已有面积身份不匹配")
         hq = resolve_fir_coefficients(cfg["filter_decimator"])
         mask = candidates.check_fir_mask(hq, ref_chain.prototype_taps())
         if (hq.tolist() != item["hq"]
@@ -147,6 +157,16 @@ def verified_areas(root: Path, configs: list[dict]) -> dict:
         areas[item["candidate_hash"]] = row["area_um2"]
     return {"areas": areas, "source": str(root), "manifest_sha256": manifest_sha,
             "results_sha256": _sha(root / "results.json"), "scope": contract["scope"]}
+
+
+def audit_historical_areas(root: Path) -> dict:
+    """只读核对冻结面积及其原始文件；返回值不得注入当前搜索缓存。"""
+    return {**_checked_areas(root, None), "reuse_allowed": False}
+
+
+def verified_areas(root: Path, configs: list[dict]) -> dict:
+    """仅当候选、当前生成 RTL 与冻结身份完全相同时允许复用面积。"""
+    return {**_checked_areas(root, configs), "reuse_allowed": True}
 
 
 def main_cases(definition: dict) -> list:

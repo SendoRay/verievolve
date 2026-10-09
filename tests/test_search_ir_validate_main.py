@@ -103,10 +103,13 @@ has_c_artifacts = pytest.mark.skipif(
 
 
 @has_c_artifacts
-def test_actual_c_area_chain_is_read_only_and_matches_all_three_candidates():
-    result = vm.verified_areas(vm.DEFAULT_AREA_RUN, development_candidates())
+def test_actual_c_area_chain_remains_read_only_auditable_but_not_reusable():
+    result = vm.audit_historical_areas(vm.DEFAULT_AREA_RUN)
     assert len(result["areas"]) == 3
     assert all(area > 0 for area in result["areas"].values())
+    assert result["reuse_allowed"] is False
+    with pytest.raises(EvaluationError, match="身份不匹配"):
+        vm.verified_areas(vm.DEFAULT_AREA_RUN, development_candidates())
 
 
 @has_c_artifacts

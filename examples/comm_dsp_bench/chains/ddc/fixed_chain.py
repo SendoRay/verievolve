@@ -1,12 +1,12 @@
 """DDC 整数 bit-true 候选链（与未来 RTL 逐位对应的整数域模型）。
 
 位语义约定（全部冻结于 spec.py）：
-  输入   : 12 位 Q1.11（场景统一 ADC 口径，rne 量化）
+  输入   : 12 位 Q1.11（场景统一 ADC 口径，就近且半值向正无穷量化）
   NCO    : 32 位相位累加器 → 高 B 位为查表相位字 → tpl_cordic 位精确
            sin/cos（16 位 Q1.15；LUT 深度/插值或 CORDIC 级数由候选定）
   混频   : 12×16 位乘积（Q2.26）→ 候选可选乘积丢位 → 求和 → 右移 11 位
            回 Q1.15（16 位，饱和计数）
-  FIR    : 对称 33 抽头；系数量化 Q(Wc−2).(Wc−2)（rne）；乘积可选丢位；
+  FIR    : 对称 33 抽头；系数量化 Q(Wc−2).(Wc−2)（半值向正无穷）；乘积可选丢位；
            精确累加后按候选累加位宽饱和；输出右移 (Wc−2) 位回 Q1.15
   抽取   : 每 R 样点取 1（无额外数值操作）
 """
@@ -17,6 +17,13 @@ import math
 from dataclasses import dataclass
 
 import numpy as np
+
+from numeric_semantics import (
+    FLOOR,
+    NEAREST_TIES_TO_POS_INF,
+    normalize_rounding_mode,
+    round_shift,
+)
 
 from . import spec
 
@@ -40,12 +47,8 @@ def _tpl_cordic():
 # ---------------------------------------------------------------------------
 
 def shr_round(v: np.ndarray, s: int, mode: str) -> np.ndarray:
-    """算术右移 s 位；rne = half-up（与 common.quant_rne 一致）。"""
-    if s <= 0:
-        return v
-    if mode == "trunc":
-        return v >> s
-    return (v + (1 << (s - 1))) >> s
+    """按显式模式右移；历史 ``rne/trunc`` 仅作为读取兼容别名。"""
+    return round_shift(v, s, mode)
 
 
 def drop_low(v: np.ndarray, s: int, mode: str) -> np.ndarray:
@@ -96,7 +99,7 @@ def mixer_fixed(i12: np.ndarray, q12: np.ndarray,
                 cmul_cfg: dict) -> dict:
     """复数混频：re = I·cos + Q·sin，im = Q·cos − I·sin。
 
-    候选 cmul_cfg：prod_drop（乘积丢位）、mode（rne/trunc）。
+    候选 cmul_cfg：prod_drop（乘积丢位）、mode（显式舍入模式）。
     结构（direct/karatsuba）在整数域位恒等，只影响硬件代价（见
     certfit/tpl_cmul.py 关键代数事实），不进入数值候选空间。
     """
@@ -118,8 +121,13 @@ def mixer_fixed(i12: np.ndarray, q12: np.ndarray,
 def quantize_coeffs(h: np.ndarray, wc: int, mode: str) -> np.ndarray:
     """原型系数 → Q(Wc−2).(Wc−2) 整数（保持对称性）。"""
     scale = float(1 << (wc - 2))
-    hq = np.floor(h * scale + 0.5).astype(np.int64) if mode == "rne" else \
-        np.floor(h * scale).astype(np.int64)
+    explicit = normalize_rounding_mode(mode)
+    if explicit == NEAREST_TIES_TO_POS_INF:
+        hq = np.floor(h * scale + 0.5).astype(np.int64)
+    elif explicit == FLOOR:
+        hq = np.floor(h * scale).astype(np.int64)
+    else:  # pragma: no cover - normalize_rounding_mode is exhaustive
+        raise AssertionError(explicit)
     return hq
 
 

@@ -11,33 +11,25 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterable, Sequence
 
+from numeric_semantics import (
+    normalize_rounding_mode,
+    round_shift as semantic_round_shift,
+    saturate_signed,
+    wrap_signed as semantic_wrap_signed,
+)
+
 
 def round_shift(value: int, bits: int, mode: str) -> int:
-    """算术右移；rne 沿用仓库既有的 half-up 整数语义。"""
-    if bits < 0:
-        return value << (-bits)
-    if bits == 0:
-        return value
-    if mode == "trunc":
-        return value >> bits
-    if mode != "rne":
-        raise ValueError(f"unknown rounding mode: {mode}")
-    return (value + (1 << (bits - 1))) >> bits
+    """按公共显式语义缩放；历史别名保持逐位兼容。"""
+    return int(semantic_round_shift(value, bits, mode))
 
 
 def wrap_signed(value: int, width: int) -> int:
-    if width < 1:
-        raise ValueError(f"signed width must be positive, got {width}")
-    mask = (1 << width) - 1
-    raw = value & mask
-    return raw - (1 << width) if raw >= (1 << (width - 1)) else raw
+    return semantic_wrap_signed(value, width)
 
 
 def sat_signed(value: int, width: int) -> int:
-    if width < 1:
-        raise ValueError(f"signed width must be positive, got {width}")
-    lo, hi = -(1 << (width - 1)), (1 << (width - 1)) - 1
-    return min(max(value, lo), hi)
+    return saturate_signed(value, width)
 
 
 @dataclass
@@ -85,8 +77,7 @@ class CICBitTrue:
             raise ValueError(f"B must be nonnegative and monotone: {self.B}")
         if self.overflow not in ("wrap", "sat"):
             raise ValueError(f"invalid overflow mode: {self.overflow}")
-        if self.rounding not in ("rne", "trunc"):
-            raise ValueError(f"invalid rounding mode: {self.rounding}")
+        self.rounding = normalize_rounding_mode(self.rounding)
         self.reset()
 
     def reset(self) -> None:

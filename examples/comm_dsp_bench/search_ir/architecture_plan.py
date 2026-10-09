@@ -12,6 +12,12 @@ import json
 from copy import deepcopy
 from typing import Any, Mapping
 
+from numeric_semantics import (
+    EXPLICIT_ROUNDING_MODES,
+    LEGACY_ROUNDING_ALIASES,
+    normalize_rounding_mode,
+)
+
 from .canonicalize import candidate_hash
 from .formula_contract import FormulaContractError, formula_hash, validate_formula_request
 from .schema import (
@@ -30,7 +36,7 @@ _TOP_REQUIRED = {"schema_version", "formula_sha256", "kind", "nco", "filter_deci
 _TOP_OPTIONAL = {"rationale"}
 _DEPTHS = {64, 128, 256, 512, 1024}
 _INTERPOLATIONS = {"nearest", "linear", "quad"}
-_ROUNDING = {"rne", "trunc"}
+_ROUNDING = set(EXPLICIT_ROUNDING_MODES) | set(LEGACY_ROUNDING_ALIASES)
 
 
 class ArchitecturePlanError(ValueError):
@@ -180,12 +186,22 @@ def architecture_plan(
     filter_decimator: Mapping[str, Any],
     rationale: list[str] | None = None,
 ) -> dict[str, Any]:
+    nco_plan = deepcopy(dict(nco))
+    if nco_plan.get("strategy") == "coarse_residual" and isinstance(
+        nco_plan.get("product_rounding"), str
+    ):
+        nco_plan["product_rounding"] = normalize_rounding_mode(
+            nco_plan["product_rounding"]
+        )
+    filter_plan = deepcopy(dict(filter_decimator))
+    if isinstance(filter_plan.get("rounding"), str):
+        filter_plan["rounding"] = normalize_rounding_mode(filter_plan["rounding"])
     plan: dict[str, Any] = {
         "schema_version": ARCHITECTURE_PLAN_SCHEMA,
         "formula_sha256": formula_hash(formula),
         "kind": "ddc-architecture-plan",
-        "nco": deepcopy(dict(nco)),
-        "filter_decimator": deepcopy(dict(filter_decimator)),
+        "nco": nco_plan,
+        "filter_decimator": filter_plan,
     }
     if rationale is not None:
         plan["rationale"] = list(rationale)

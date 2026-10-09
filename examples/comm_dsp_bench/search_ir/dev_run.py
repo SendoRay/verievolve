@@ -27,6 +27,7 @@ BENCH = Path(__file__).resolve().parents[1]
 ROOT = BENCH.parent.parent
 THRESHOLD_SOURCE = BENCH / "experiments_system/ddc_witness_v1/preflight_manifest.json"
 _SOURCE_PATHS = [
+    BENCH / "numeric_semantics.py",
     *(BENCH / "search_ir" / name for name in (
         "__init__.py", "schema.py", "validate.py", "canonicalize.py",
         "lower_bittrue.py", "lower_rtl.py", "evaluate.py", "dev_run.py", "dev_fixtures.py",

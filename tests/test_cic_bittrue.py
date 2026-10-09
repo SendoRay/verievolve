@@ -26,11 +26,14 @@ def _sat16(value: int) -> int:
     return min(max(value, -32768), 32767)
 
 
-def test_round_shift_matches_frozen_half_up_semantics():
-    assert [round_shift(x, 1, "rne") for x in (-3, -2, -1, 0, 1, 2, 3)] == [
+def test_round_shift_matches_explicit_signed_semantics():
+    assert [
+        round_shift(x, 1, "nearest_ties_to_pos_inf")
+        for x in (-3, -2, -1, 0, 1, 2, 3)
+    ] == [
         -1, -1, 0, 0, 1, 1, 2
     ]
-    assert [round_shift(x, 1, "trunc") for x in (-3, -2, -1, 0, 1, 2, 3)] == [
+    assert [round_shift(x, 1, "floor") for x in (-3, -2, -1, 0, 1, 2, 3)] == [
         -2, -1, -1, 0, 0, 1, 1
     ]
 
@@ -52,7 +55,10 @@ def test_full_width_wrap_matches_equivalent_fir_for_all_contract_combos():
         causal = np.convolve(x, _fir_coefficients(R, N))[: len(x)]
         exact = causal[::R]
         d = row["B_fmt"]
-        expected = [_sat16(round_shift(int(v), d, "rne")) for v in exact]
+        expected = [
+            _sat16(round_shift(int(v), d, "nearest_ties_to_pos_inf"))
+            for v in exact
+        ]
         assert got == expected, (R, N)
 
 
@@ -64,8 +70,12 @@ def test_full_width_wrap_self_heals_on_long_near_full_scale_stream():
         got, events = CICBitTrue(row).run(x.tolist())
         causal = np.convolve(x, _fir_coefficients(R, N))[: len(x)]
         exact = causal[::R]
-        expected = [_sat16(round_shift(int(v), row["B_fmt"], "rne"))
-                    for v in exact]
+        expected = [
+            _sat16(
+                round_shift(int(v), row["B_fmt"], "nearest_ties_to_pos_inf")
+            )
+            for v in exact
+        ]
         assert sum(events["internal_wrap_event"]) > 0
         assert got == expected, (R, N)
 

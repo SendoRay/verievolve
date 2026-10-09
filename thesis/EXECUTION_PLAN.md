@@ -1,5 +1,7 @@
 # EXECUTION_PLAN.md — VeriEvolve 论文执行计划
 
+> 2026-10-08 更新：当前文章主线与系统实施顺序见 [chengzhy/iknow.md](../chengzhy/iknow.md) §3–§7。本文件保留早期计划；已冻结实验仍按各自协议解释，新实验绑定当前文章主张并独立登记。
+
 - 建立日期：2026-09-28
 - 状态：工作计划 v0.1
 - 方向依据：[`DIRECTION.md`](DIRECTION.md)

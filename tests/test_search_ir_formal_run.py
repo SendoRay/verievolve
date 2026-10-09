@@ -128,17 +128,16 @@ has_pilot = pytest.mark.skipif(not (formal.PILOT / "results.json").exists(), rea
 
 
 @has_pilot
-def test_warm_cache_imports_all_and_only_audited_successes(tmp_path):
+def test_warm_cache_refuses_legacy_rtl_after_numeric_semantics_change(tmp_path):
     contract = copy.deepcopy(json.loads((formal.PILOT / "manifest.json").read_text())["contract"])
     contract["sources"] = formal.synth._sources()
-    cache = formal.WarmAreaCache(tmp_path, contract)
-    assert len(cache.entries) == 37 and len(cache.warm_index) == 37
-    assert all(entry["row"]["status"] == "ok" for entry in cache.entries.values())
+    with pytest.raises(Exception, match="身份不匹配"):
+        formal.WarmAreaCache(tmp_path, contract)
 
 
 @has_pilot
-def test_history_calibration_accepts_added_modules_not_changed_sources():
+def test_history_calibration_is_not_relabelled_after_rtl_change():
     contract = copy.deepcopy(json.loads((formal.PILOT / "manifest.json").read_text())["contract"])
     contract["sources"] = formal.synth._sources()
-    record = formal._calibration_record(contract)
-    assert record["epsilon_A_um2"] == formal.EPS_A
+    with pytest.raises(Exception, match="绑定或进程状态不一致"):
+        formal._calibration_record(contract)

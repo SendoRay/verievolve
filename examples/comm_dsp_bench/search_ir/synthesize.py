@@ -70,6 +70,7 @@ def _file(path: Path) -> dict:
 
 def _sources() -> list[dict]:
     paths = [
+        BENCH / "numeric_semantics.py",
         *Path(__file__).parent.glob("*.py"),
         *(BENCH / "chains/ddc" / name for name in (
             "spec.py", "fixed_chain.py", "ref_chain.py", "scenarios.py",

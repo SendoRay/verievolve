@@ -229,3 +229,6 @@ P0-1 是纯代码修复）。P1-3 与 P2-2 都消耗 API 预算，**必须排在
 
 **禁止**：把诊断数字当结论引用；把"修评价器"写成研究创新；用单次运行支撑统计主张；
 在未补齐任务族的情况下使用"收发链全集"表述。
+### P1-1 partial: QNTF power-fold control
+
+The reproducible control is now run and archived at `examples/comm_dsp_bench/experiments_system/p1_1_qntf_powerfold_v1_20261009/results.json` (SHA256 `9f4a68944ca6063d002f863cf5bcb0185346f72e3ff79fe2e436d374aa2b89ca`). It covers 7,392 rows (77 scenes × 96 candidates). The power identity closes at `1.5626874120572496e-16`; the stage-uncorrelated estimate differs from exact P0-2 truth by mean `-0.09610462907438881 dB` and max absolute `1.5741077728829893 dB`. This is only a QNTF-style control, not the required full Nicholas first-order spur baseline, so the gap remains open.

@@ -21,7 +21,7 @@ from search_ir import (
 
 
 @pytest.mark.parametrize("coefficient_bits", [11, 12, 16])
-@pytest.mark.parametrize("rounding", ["rne", "trunc"])
+@pytest.mark.parametrize("rounding", ["nearest_ties_to_pos_inf", "floor"])
 def test_direct_and_polyphase_are_bit_identical_without_product_drop(
     coefficient_bits, rounding
 ):
@@ -44,7 +44,10 @@ def test_polyphase_matches_legacy_direct_per_tap_semantics():
     x_re = rng.integers(-(1 << 14), 1 << 14, size=193, dtype=np.int64)
     x_im = rng.integers(-(1 << 14), 1 << 14, size=193, dtype=np.int64)
     node = polyphase_decimator(
-        coefficient_bits=12, product_drop=2, accumulator_bits=24, rounding="rne"
+        coefficient_bits=12,
+        product_drop=2,
+        accumulator_bits=24,
+        rounding="nearest_ties_to_pos_inf",
     )
     got = emulate_fir_decimator(node, x_re, x_im)
     hq = resolve_fir_coefficients(node)
@@ -52,7 +55,12 @@ def test_polyphase_matches_legacy_direct_per_tap_semantics():
         x_re,
         x_im,
         hq,
-        {"wc": 12, "prod_drop": 2, "wacc": 24, "mode": "rne"},
+        {
+            "wc": 12,
+            "prod_drop": 2,
+            "wacc": 24,
+            "mode": "nearest_ties_to_pos_inf",
+        },
     )
     np.testing.assert_array_equal(got["re"], legacy["re"][32::2])
     np.testing.assert_array_equal(got["im"], legacy["im"][32::2])
@@ -63,10 +71,10 @@ def test_direct_preadd_and_polyphase_have_distinct_quantization_semantics():
     x_re = rng.integers(-(1 << 15), 1 << 15, size=193, dtype=np.int64)
     x_im = rng.integers(-(1 << 15), 1 << 15, size=193, dtype=np.int64)
     direct = emulate_fir_decimator(
-        direct_symmetric_fir(12, product_drop=4, rounding="trunc"), x_re, x_im
+        direct_symmetric_fir(12, product_drop=4, rounding="floor"), x_re, x_im
     )
     polyphase = emulate_fir_decimator(
-        polyphase_decimator(12, product_drop=4, rounding="trunc"), x_re, x_im
+        polyphase_decimator(12, product_drop=4, rounding="floor"), x_re, x_im
     )
     assert np.any(direct["re"] != polyphase["re"]) or np.any(
         direct["im"] != polyphase["im"]
@@ -88,9 +96,14 @@ def _literal(width, value):
     "node",
     [
         direct_symmetric_fir(12),
-        direct_symmetric_fir(12, product_drop=4, accumulator_bits=24, rounding="trunc"),
+        direct_symmetric_fir(12, product_drop=4, accumulator_bits=24, rounding="floor"),
         polyphase_decimator(12),
-        polyphase_decimator(12, product_drop=2, accumulator_bits=24, rounding="rne"),
+        polyphase_decimator(
+            12,
+            product_drop=2,
+            accumulator_bits=24,
+            rounding="nearest_ties_to_pos_inf",
+        ),
     ],
 )
 def test_fir_streaming_rtl_matches_bittrue_model(tmp_path, node):

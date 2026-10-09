@@ -5,7 +5,17 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from numeric_semantics import (
+    EXPLICIT_ROUNDING_MODES,
+    LEGACY_ROUNDING_ALIASES,
+    NEAREST_TIES_TO_POS_INF,
+    normalize_rounding_mode,
+)
+
 from .schema import CONTRACT_VERSION, FORMULA_VERSION, SCHEMA_VERSION
+
+
+_ROUNDING_INPUTS = set(EXPLICIT_ROUNDING_MODES) | set(LEGACY_ROUNDING_ALIASES)
 
 
 class IRValidationError(ValueError):
@@ -128,7 +138,7 @@ def _validate_nco(value: Any, path: str, depth: int = 0) -> None:
         if obj["identity"] != "exp(j*theta)=exp(j*coarse)*exp(j*residual)":
             _fail(f"{path}.identity", "unknown exact identity")
         _integer(obj["split_bits"], f"{path}.split_bits", 2, 14)
-        _choice(obj["product_rounding"], f"{path}.product_rounding", {"rne", "trunc"})
+        _choice(obj["product_rounding"], f"{path}.product_rounding", _ROUNDING_INPUTS)
         if obj["product_saturation"] != "sat":
             _fail(f"{path}.product_saturation", "must be sat")
         _validate_nco(obj["coarse"], f"{path}.coarse", depth + 1)
@@ -168,7 +178,7 @@ def _validate_fir(value: Any, path: str) -> None:
     accumulator_bits = _integer(obj["accumulator_bits"], f"{path}.accumulator_bits", 0, 48)
     if accumulator_bits != 0:
         _integer(accumulator_bits, f"{path}.accumulator_bits", 20, 48)
-    _choice(obj["rounding"], f"{path}.rounding", {"rne", "trunc"})
+    _choice(obj["rounding"], f"{path}.rounding", _ROUNDING_INPUTS)
     if obj["saturation"] != "sat":
         _fail(f"{path}.saturation", "must be sat")
     _validate_stream(obj["input"], f"{path}.input", (16, 15, True), (1, 1))
@@ -215,13 +225,18 @@ def validate_candidate(candidate: Mapping[str, Any]) -> None:
         {"kind", "product_drop", "rounding", "saturation", "output"},
     )
     _integer(mixer["product_drop"], "candidate.mixer.product_drop", 0, 0)
+    _choice(mixer["rounding"], "candidate.mixer.rounding", _ROUNDING_INPUTS)
     if (
-        mixer["kind"],
-        mixer["product_drop"],
-        mixer["rounding"],
-        mixer["saturation"],
-    ) != ("complex_multiply", 0, "rne", "sat"):
-        _fail("candidate.mixer", "v1 mixer is frozen to exact/rne/sat")
+        mixer["kind"] != "complex_multiply"
+        or mixer["product_drop"] != 0
+        or normalize_rounding_mode(mixer["rounding"])
+        != NEAREST_TIES_TO_POS_INF
+        or mixer["saturation"] != "sat"
+    ):
+        _fail(
+            "candidate.mixer",
+            "v1 mixer is frozen to exact/nearest_ties_to_pos_inf/sat",
+        )
     _validate_stream(mixer["output"], "candidate.mixer.output", (16, 15, True), (1, 1))
     _validate_fir(obj["filter_decimator"], "candidate.filter_decimator")
 

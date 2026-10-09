@@ -42,7 +42,10 @@ def test_unregistered_phasor_composition_is_a_valid_tree():
             residual=cordic_sincos(stages=7, phase_bits=12),
             split_bits=8,
         ),
-        polyphase_decimator(coefficient_bits=14, rounding="rne"),
+        polyphase_decimator(
+            coefficient_bits=14,
+            rounding="nearest_ties_to_pos_inf",
+        ),
     )
     validate_candidate(hybrid)
     assert hybrid["nco"]["coarse"]["kind"] == "lut_sincos"
@@ -134,4 +137,4 @@ def test_raw_json_rejects_type_aliases_and_containers(path, value):
 def test_valid_candidate_identity_is_unchanged_by_strict_validation():
     candidate = ddc_candidate(lut_sincos(256, "linear", 12), direct_symmetric_fir(16))
     validate_candidate(candidate)
-    assert candidate_hash(candidate) == "9d32c95267b25f2633df23a18e7bbd18cc8ba30395f855990b51eda368254f3c"
+    assert candidate_hash(candidate) == "5a616173021041c0423dfb863171958dd8f2f8748be68c2c7bbb07eb5527beac"

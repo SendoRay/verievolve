@@ -23,8 +23,8 @@
 16. Sharma et al., "OpenEvolve," https://github.com/algorithmicsuperintelligence/openevolve, 2025.
 17. Sakana AI, "ShinkaEvolve: Towards sample-efficient program evolution," arXiv:2509.19349, 2025.
 18. Lehman et al., "Evolution through large models," 2022; Mouret & Clune, "Illuminating search spaces by mapping elites," 2015.
-19. EvolVE: "Evolution strategies for LLM-driven chip design," arXiv:2601.18067, 2026.
-20. REvolution: "LLM-driven evolutionary RTL," ASP-DAC 2026, arXiv:2510.21407.
+19. Hsin, Deng, Hsieh, Huang, Hung, "EvolVE: Evolutionary Search for LLM-based Verilog Generation and Optimization," [arXiv:2601.18067](https://arxiv.org/abs/2601.18067), 2026. 方法见 §3.1–§3.2。
+20. Min, Cho, Jang, Kang, "REvolution: An Evolutionary Framework for RTL Generation driven by Large Language Models," ASP-DAC 2026, [arXiv:2510.21407](https://arxiv.org/abs/2510.21407), 2025. 候选表示与反馈见 §III。
 21. COEVO: "Co-evolutionary LLM RTL optimization," arXiv/GitHub hping666/COEVO, 2026.
 22. EvoVerilog: Zhang et al., "Multi-objective LLM population search for Verilog," arXiv:2508.13156, 2025.
 
@@ -44,7 +44,7 @@
 
 32. Willsey et al., "egg: Fast and extensible equality saturation," POPL 2021.
 33. Coward et al., "Automatic datapath optimization using e-graphs," ARITH 2022.
-34. ROVER: "Reducing operator count in RTL via e-graph rewriting with verification," 2024.
+34. Coward, Drane, Constantinides, "ROVER: RTL Optimization via Verified E-Graph Rewriting," [arXiv:2406.12421](https://arxiv.org/abs/2406.12421), 2024. 数值语义、变换条件及验证见 §III–§VI。
 35. ASPEN: "LLM-generated e-graph rewrite rules for RTL datapath optimization," MLCAD 2025.
 36. Necula, "Proof-carrying code," POPL 1997.
 
@@ -57,6 +57,11 @@
 ## 通信标准
 
 40. 3GPP TS 38.211 (NR; Physical channels and modulation), TS 38.212 (Multiplexing and channel coding).
+
+## 公式到硬件系统规划补充
+
+41. Li, Mandell, Pan, "Interpretable and Verifiable Hardware Generation with LLM-Driven Stepwise Refinement," [arXiv:2606.19387](https://arxiv.org/abs/2606.19387), 2026. 已核对 §3–§4 的规格和细化规则；数值近似与链级质量仍需按具体任务比较。该文 §3 明确未将活性性质纳入规格。
+42. OpenROAD Project, [OpenSTA 官方说明](https://openroad.readthedocs.io/en/latest/main/src/sta/README.html). 用于规划 Liberty、SDC 与网表静态时序分析流程，不作为硬件性能实验结果。
 
 ## 本文工作自身产物（实验数据）
 

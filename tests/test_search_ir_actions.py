@@ -80,7 +80,7 @@ def test_wrap_and_second_step_use_intermediate_tree():
     assert wrapped["residual"]["stages"] == 12
     assert wrapped["residual"]["phase_bits"] == 16
     assert wrapped["split_bits"] == 8
-    assert wrapped["product_rounding"] == "rne"
+    assert wrapped["product_rounding"] == "nearest_ties_to_pos_inf"
     assert wrapped["product_saturation"] == "sat"
     assert result["actions"][1]["path"] == "/nco/coarse/interpolation"
     assert result["candidate"]["nco"]["coarse"]["interpolation"] == "nearest"
@@ -131,7 +131,11 @@ def test_swap_leaf_preserves_phase_bits_and_uses_fixed_defaults(kind):
 
 def test_fir_swap_preserves_numeric_fields_and_inverse_cancels():
     candidate = make_candidate(coefficient_bits=14)
-    candidate["filter_decimator"].update(product_drop=3, accumulator_bits=28, rounding="trunc")
+    candidate["filter_decimator"].update(
+        product_drop=3,
+        accumulator_bits=28,
+        rounding="floor",
+    )
     result = propose(candidate, ScriptedRNG([2, 4, 0, 4, 0]), "structure")
     assert result["error"] is None and result["candidate"] == candidate
     first_fir = result["actions"][0]["after"]
@@ -173,7 +177,10 @@ def test_uniform_jump_reaches_non_neighbor_and_sentinel_domain():
 def test_rounding_toggle_has_no_neighbor_draw():
     rng = ScriptedRNG([1, 3])
     result = propose(make_candidate(), rng, "numeric")
-    assert result["candidate"]["filter_decimator"]["rounding"] == "trunc"
+    assert (
+        result["candidate"]["filter_decimator"]["rounding"]
+        == "floor"
+    )
     assert len(rng.calls) == 2
 
 

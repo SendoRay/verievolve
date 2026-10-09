@@ -1,0 +1,52 @@
+{
+  "schema_version": "hardware-system-planning-review-v1",
+  "date": "2026-10-08",
+  "scope": "Targeted read-only code review and existing regression checks for an article-led system plan; no new research experiment or evaluator modification",
+  "source_commit": "1b49a2a3fa1cf19d1c3699ef4124f3d18ba2fbd4",
+  "plan": "chengzhy/iknow.md sections 3-7",
+  "verification": {
+    "command": "python3 -m pytest -q tests/test_search_ir_formula_contract.py tests/test_search_ir_architecture_plan.py tests/test_search_ir_llm_planner.py tests/test_search_ir_rtl_verify.py tests/test_search_ir_ddc.py",
+    "exit_code": 0,
+    "observed_summary": "36 passed in 2.21s",
+    "passed": 36,
+    "limitations": "Existing targeted tests only; no full-repository regression, new timing measurement, full-domain proof, paid LLM call, or formal search run"
+  },
+  "findings": [
+    {
+      "id": "planner-feedback",
+      "source": "examples/comm_dsp_bench/search_ir/llm_planner.py::run_llm_planning_loop",
+      "observation": "Returns success when architecture compilation succeeds; its loop does not consume chain-quality or synthesis feedback.",
+      "claim_ids": ["C2", "C4"]
+    },
+    {
+      "id": "quality-acceptance",
+      "source": "examples/comm_dsp_bench/verify_formula_planner_dev.py::main; search_ir/evaluate.py::evaluate_candidate; search_ir/verification_status.py::verification_status",
+      "observation": "Development evaluation status ok means measurement succeeded with legal FIR mask. The verification entry point does not compare measured Q_dev against formula_request.requirements.quality.maximum. This is a deployment acceptance gap, not a claim that the measured candidate failed its numerical budget.",
+      "claim_ids": ["C2"]
+    },
+    {
+      "id": "stream-verification",
+      "source": "examples/comm_dsp_bench/search_ir/rtl_verify.py::verify_candidate_rtl",
+      "observation": "Standalone verifier assumes fixed input-index-to-output timing, holds out_ready high, and does not drive a generic accepted-transaction scoreboard. Other tests already cover selected output-backpressure behavior.",
+      "claim_ids": ["C2"]
+    },
+    {
+      "id": "timing-and-schedule",
+      "source": "examples/comm_dsp_bench/search_ir/synthesize.py::build_contract; search_ir/planning_loop.py::capability_manifest",
+      "observation": "Synthesis contract sets sdc to null, timing_power_claims_allowed to false and microarchitecture_search to false. The public plan grammar lacks pipeline and iterative-resource choices.",
+      "claim_ids": ["C2", "C3"]
+    },
+    {
+      "id": "formula-scope",
+      "source": "examples/comm_dsp_bench/search_ir/formula_contract.py::validate_formula_request",
+      "observation": "Validates nodes against the fixed DDC graph; explicit formula input currently does not imply general formula compilation.",
+      "claim_ids": ["C2", "C5"]
+    },
+    {
+      "id": "rounding-contract",
+      "source": "examples/comm_dsp_bench/chains/ddc/fixed_chain.py::shr_round",
+      "observation": "Legacy rne is documented and implemented as adding a half unit before arithmetic shift. A future semantic schema should state tie behavior explicitly and preserve historical semantics through versioning.",
+      "claim_ids": ["C1", "C2"]
+    }
+  ]
+}

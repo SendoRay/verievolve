@@ -3,7 +3,7 @@
 位语义与 fixed_chain.py 整数模型逐位对应：
   NCO   : 32 位相位累加器 → 高 B 位 MSB 对齐 16 位相位码 → tpl_cordic 同款
           四分之一波 LUT（_table）或展开 CORDIC（19/18 位自然回绕）
-  混频   : 4 个 12×16 乘积 →（可选 pd 丢位，rne=half-up/trunc）→ 求和
+  混频   : 4 个 12×16 乘积 →（可选 pd 丢位，显式舍入模式）→ 求和
           → >>11（同模式舍入）→ 饱和 16 位
   FIR   : pd=0 对称预加（17 乘/通道，整数域与逐抽头位恒等）；pd>0 逐抽头
           乘积丢位求和（33 乘/通道）→ 精确累加 →（可选 wacc 饱和）
@@ -22,6 +22,7 @@ if str(_BENCH) not in sys.path:
     sys.path.insert(0, str(_BENCH))
 
 from certfit import tpl_cordic
+from numeric_semantics import signed_round_shift_expression
 
 
 # ---------------------------------------------------------------------------
@@ -236,12 +237,11 @@ def _gen_mixer(cmul_cfg: dict) -> list:
                         "isc": ("i_r", "nco_sin"), "qcc": ("q_r", "nco_cos")}.items():
         lines.append(f"    wire signed [27:0] {tag} = $signed({a}) * $signed({b});")
     if pd > 0:
-        half = 1 << (pd - 1) if mode == "rne" else 0
         for tag in ("pic", "qsc", "isc", "qcc"):
-            if mode == "rne":
-                lines.append(f"    wire signed [27:0] {tag}_d = (({tag} + 28'sd{half}) >>> {pd}) <<< {pd};")
-            else:
-                lines.append(f"    wire signed [27:0] {tag}_d = ({tag} >>> {pd}) <<< {pd};")
+            shifted = signed_round_shift_expression(tag, 28, pd, mode)
+            lines.append(
+                f"    wire signed [27:0] {tag}_d = ({shifted}) <<< {pd};"
+            )
         src = {t: f"{t}_d" for t in ("pic", "qsc", "isc", "qcc")}
     else:
         src = {t: t for t in ("pic", "qsc", "isc", "qcc")}
@@ -250,12 +250,9 @@ def _gen_mixer(cmul_cfg: dict) -> list:
         f"    wire signed [28:0] im_pre = {src['qcc']} - {src['isc']};",
     ]
     for tag, pre in (("mix_re", "re_pre"), ("mix_im", "im_pre")):
-        if mode == "rne":
-            lines.append(f"    wire signed [28:0] {pre}_r = {pre} + 29'sd1024;")
-        else:
-            lines.append(f"    wire signed [28:0] {pre}_r = {pre};")
+        shifted = signed_round_shift_expression(pre, 29, 11, mode)
         lines += [
-            f"    wire signed [17:0] {tag}_sh = {pre}_r >>> 11;",
+            f"    wire signed [17:0] {tag}_sh = {shifted};",
             f"    wire signed [15:0] {tag}_sat = ({tag}_sh > 32767) ? 16'sd32767 :"
             f" (({tag}_sh < -32768) ? -16'sd32768 : {tag}_sh[15:0]);",
         ]
@@ -279,7 +276,6 @@ def _gen_fir(fir_cfg: dict) -> list:
                           int(fir_cfg["prod_drop"]), fir_cfg["mode"])
     hq = fir_cfg["hq"]
     taps = len(hq)
-    half_out = 1 << (wc - 3)  # >>（wc−2）的 rne 半值
     lines = [
         f"    // ---- FIR：{taps} 抽头对称，wc={wc} wacc={wacc} pd={pd} mode={mode} ----",
         f"    localparam signed [{wc-1}:0] H0 = -{abs(int(hq[0])) if hq[0] < 0 else 0};" ,
@@ -337,12 +333,13 @@ def _gen_fir(fir_cfg: dict) -> list:
                     xw = f"line_{ch}[{k-1}]"
                 lines.append(
                     f"    wire signed [{16 + wc - 1}:0] prod_{ch}{k} = $signed({xw}) * $signed(HK{k});")
-                if mode == "rne":
-                    lines.append(
-                        f"    wire signed [{16 + wc - 1}:0] prod_{ch}{k}_d = ((prod_{ch}{k} + {16 + wc}'sd{1 << (pd - 1)}) >>> {pd}) <<< {pd};")
-                else:
-                    lines.append(
-                        f"    wire signed [{16 + wc - 1}:0] prod_{ch}{k}_d = (prod_{ch}{k} >>> {pd}) <<< {pd};")
+                shifted = signed_round_shift_expression(
+                    f"prod_{ch}{k}", 16 + wc, pd, mode
+                )
+                lines.append(
+                    f"    wire signed [{16 + wc - 1}:0] prod_{ch}{k}_d = "
+                    f"({shifted}) <<< {pd};"
+                )
                 terms.append(f"prod_{ch}{k}_d")
             lines.append(
                 f"    wire signed [{16 + wc + 5}:0] acc_{ch} = " + " + ".join(terms) + ";")
@@ -358,14 +355,11 @@ def _gen_fir(fir_cfg: dict) -> list:
         else:
             lines.append(f"    wire signed [{16 + wc + 5}:0] accs_{ch} = acc_{ch};")
         # 输出舍入 + 饱和 16 位
-        if mode == "rne":
-            lines.append(
-                f"    wire signed [{16 + wc + 5}:0] accq_{ch} = accs_{ch} + {16 + wc + 6}'sd{half_out};")
-        else:
-            lines.append(
-                f"    wire signed [{16 + wc + 5}:0] accq_{ch} = accs_{ch};")
+        shifted = signed_round_shift_expression(
+            f"accs_{ch}", 16 + wc + 6, wc - 2, mode
+        )
         lines += [
-            f"    wire signed [17:0] ysh_{ch} = accq_{ch} >>> {wc - 2};",
+            f"    wire signed [17:0] ysh_{ch} = {shifted};",
             f"    wire signed [15:0] y_{ch}_sat = (ysh_{ch} > 32767) ? 16'sd32767 :"
             f" ((ysh_{ch} < -32768) ? -16'sd32768 : ysh_{ch}[15:0]);",
         ]

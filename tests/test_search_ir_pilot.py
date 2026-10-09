@@ -122,6 +122,12 @@ class FakeQuality:
 @pytest.mark.parametrize("mode", ["ok", "global_deadline", "candidate_timeout", "infrastructure", "interrupt"])
 def test_paired_driver_budget_and_failures_use_only_mock_evaluation(tmp_path, monkeypatch, mode):
     monkeypatch.setattr(pilot, "PILOT_ROOT", tmp_path)
+    draft = json.loads(pilot.DRAFT.read_text())
+    draft["initial_candidates"] = [
+        {"candidate_hash": candidate_hash(candidate), "candidate": candidate}
+        for candidate in pilot.development_candidates()
+    ]
+    monkeypatch.setattr(pilot, "_validated_draft", lambda: copy.deepcopy(draft))
     monkeypatch.setattr(pilot, "_check_calibration", lambda _: {"mock": True})
     monkeypatch.setattr(pilot, "main_cases", lambda _: ["mock case, not a main waveform"])
     monkeypatch.setattr(pilot.synth, "build_contract", lambda: {"mock": True})

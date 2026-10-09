@@ -13,4 +13,8 @@ def test_standalone_rtl_verifier_matches_bittrue_model(tmp_path):
     result = verify_candidate_rtl(make_candidate("cordic"), tmp_path / "verify", samples=65)
     assert result["status"] == "ok"
     assert result["checked_output_samples"] == 17
+    assert result["accepted_input_samples"] == 65
+    assert result["transaction_check"] == "valid-ready scoreboard"
+    assert result["input_gaps_exercised"] is True
+    assert result["output_backpressure_exercised"] is True
     assert result["candidate_sha256"]

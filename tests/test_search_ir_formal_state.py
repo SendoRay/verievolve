@@ -70,7 +70,11 @@ def test_budget12_reproduces_all_72_saved_pilot_transitions():
     result = json.loads((PILOT / "results.json").read_text())
     manifest = json.loads((PILOT / "manifest.json").read_text())
     q_budget = manifest["draft"]["evaluation"]["q_budget"]
-    states = {(seed, arm): FormalState(seed, arm, budget=12, q_budget=q_budget)
+    initial = [row["candidate"] for row in manifest["draft"]["initial_candidates"]]
+    states = {(seed, arm): FormalState(
+                  seed, arm, budget=12, q_budget=q_budget,
+                  initial_candidates=initial, semantic_profile="legacy_v1",
+              )
               for seed in (11, 29, 47) for arm in ("joint", "staged")}
     for trial in result["trials"]:
         index = trial["proposal_id"]

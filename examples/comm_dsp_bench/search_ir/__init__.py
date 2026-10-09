@@ -5,6 +5,15 @@ legality.  Search algorithms and LLM backends are layered on only after the
 representation gates in ``thesis/SEARCH_PROTOCOL_v1.md`` pass.
 """
 
+from numeric_semantics import (
+    EXPLICIT_ROUNDING_MODES,
+    FLOOR,
+    NEAREST_TIES_TO_POS_INF,
+    NUMERIC_SEMANTICS_VERSION,
+    normalize_rounding_mode,
+    numeric_semantics_manifest,
+)
+
 from .canonicalize import candidate_hash, canonical_json
 from .architecture_plan import (
     ARCHITECTURE_PLAN_SCHEMA,
@@ -36,10 +45,17 @@ from .lower_bittrue import (
 )
 from .lower_rtl import lower_ddc_rtl, lower_fir_decimator_rtl, lower_nco_map_rtl
 from .planning_loop import (
+    CandidateEvaluator,
     capability_manifest,
+    evaluation_feedback,
+    normalize_candidate_evaluation,
     planner_context,
+    resume_planning_transcript,
     run_planning_loop,
 )
+from .run_archive import PlanningRunArchive
+from .development_evaluator import evaluate_with_optional_synthesis
+from .development_synthesis import DevelopmentSynthesisEvaluator
 from .llm_planner import (
     SYSTEM_MESSAGE as LLM_PLANNER_SYSTEM_MESSAGE,
     extract_json_payload,
@@ -68,13 +84,19 @@ __all__ = [
     "ARCHITECTURE_PLAN_SCHEMA",
     "CONTRACT_VERSION",
     "DDC_FORMULA_ID",
+    "DevelopmentSynthesisEvaluator",
     "FORMULA_REQUEST_SCHEMA",
     "FORMULA_VERSION",
+    "FLOOR",
     "LLM_PLANNER_SYSTEM_MESSAGE",
+    "NEAREST_TIES_TO_POS_INF",
+    "NUMERIC_SEMANTICS_VERSION",
     "ArchitecturePlanError",
+    "CandidateEvaluator",
     "FormulaContractError",
     "IRValidationError",
     "SCHEMA_VERSION",
+    "EXPLICIT_ROUNDING_MODES",
     "candidate_hash",
     "capability_manifest",
     "canonical_json",
@@ -87,6 +109,8 @@ __all__ = [
     "emulate_ddc_candidate",
     "emulate_fir_decimator",
     "emulate_nco_accumulators",
+    "evaluation_feedback",
+    "evaluate_with_optional_synthesis",
     "extract_json_payload",
     "fir_node_config",
     "leaf_nco_config",
@@ -94,16 +118,21 @@ __all__ = [
     "lower_fir_decimator_rtl",
     "lower_ddc_rtl",
     "lut_sincos",
+    "normalize_candidate_evaluation",
+    "normalize_rounding_mode",
+    "numeric_semantics_manifest",
     "phasor_compose",
     "parse_architecture_plan",
     "plan_hash",
     "plan_json",
     "planner_context",
+    "PlanningRunArchive",
     "polyphase_decimator",
     "resolve_fir_coefficients",
     "render_planner_prompt",
     "run_llm_planning_loop",
     "run_planning_loop",
+    "resume_planning_transcript",
     "split_phase_accumulators",
     "try_compile_architecture_plan",
     "validate_candidate",

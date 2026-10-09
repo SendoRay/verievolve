@@ -12,7 +12,8 @@ from .selection import family_key, lock_families, main_archive, ranked, tourname
 
 
 class FormalState:
-    def __init__(self, seed, arm, budget=32, q_budget=2.32929922807541e-5):
+    def __init__(self, seed, arm, budget=32, q_budget=2.32929922807541e-5,
+                 initial_candidates=None, semantic_profile="current"):
         if type(seed) is not int or arm not in ("joint", "staged", "cost-first"):
             raise ValueError("invalid seed or arm")
         if type(budget) is not int or budget < 8 or budget % 2:
@@ -20,6 +21,12 @@ class FormalState:
         if not math.isfinite(q_budget) or q_budget <= 0:
             raise ValueError("invalid q_budget")
         self.seed, self.arm, self.budget, self.q_budget = seed, arm, budget, q_budget
+        self.initial_candidates = copy.deepcopy(
+            development_candidates() if initial_candidates is None else initial_candidates
+        )
+        if len(self.initial_candidates) != 3:
+            raise ValueError("exactly three initial candidates are required")
+        self.semantic_profile = semantic_profile
         self.rng = np.random.Generator(np.random.PCG64(seed))
         self.population, self.history, self.families = [], {}, None
         self.last_attempt = 0
@@ -45,7 +52,8 @@ class FormalState:
         if attempt != self.last_attempt + 1 or phase not in (None, expected):
             raise ValueError("attempt order or phase mismatch")
         if attempt <= 3:
-            return {"candidate": development_candidates()[attempt - 1], "actions": [], "error": None}
+            return {"candidate": copy.deepcopy(self.initial_candidates[attempt - 1]),
+                    "actions": [], "error": None}
         family = None
         if self.arm == "cost-first":
             pool = self._cost_pool(attempt)
@@ -57,7 +65,8 @@ class FormalState:
             if self.arm == "staged" and self.families is not None:
                 family = self.families[(attempt - self.budget // 2 - 1) % len(self.families)]
             parent = tournament(self.population, self.rng, family=family)
-        result = propose(parent["candidate"], self.rng, expected)
+        result = propose(parent["candidate"], self.rng, expected,
+                         semantic_profile=self.semantic_profile)
         if family is not None and result["candidate"] is not None and family_key(result["candidate"]) != family:
             result = {**result, "candidate": None, "error": "locked structure family changed"}
         return {**result, "parent_hash": parent["candidate_hash"]}

@@ -73,7 +73,7 @@ def test_phase_split_is_exact_modulo_and_uses_centered_residual():
     assert np.all(residual_signed < step // 2)
 
 
-def _hybrid_node(rounding="rne"):
+def _hybrid_node(rounding="nearest_ties_to_pos_inf"):
     return phasor_compose(
         lut_sincos(128, "nearest", 10),
         cordic_sincos(7, 16),
@@ -111,7 +111,7 @@ def test_composition_bittrue_lowering_matches_explicit_child_product():
     np.testing.assert_array_equal(got_cos, expected_cos)
 
 
-@pytest.mark.parametrize("rounding", ["rne", "trunc"])
+@pytest.mark.parametrize("rounding", ["nearest_ties_to_pos_inf", "floor"])
 def test_composition_rtl_matches_bittrue_model(tmp_path, rounding):
     if shutil.which("iverilog") is None or shutil.which("vvp") is None:
         pytest.skip("iverilog/vvp not installed")

@@ -1,0 +1,78 @@
+{
+  "schema_version": "hardware-system-numeric-semantics-p0-v1",
+  "date": "2026-10-08",
+  "source_commit": "1b49a2a3fa1cf19d1c3699ef4124f3d18ba2fbd4",
+  "scope": "Phase B engineering correction for explicit fixed-point rounding names, independent boundary references, widened RTL rounding arithmetic, and separation of historical audit from current cache reuse; no formal research experiment",
+  "claim_ids": ["C1", "C2"],
+  "root_cause": {
+    "naming": "The historical rne implementation rounds ties toward positive infinity rather than to even; historical trunc is an arithmetic right shift and therefore floors negative values rather than truncating toward zero.",
+    "rtl": "The generated signed RTL added the half-unit bias at the original signal width. Positive values near the upper boundary could wrap before the arithmetic shift, unlike the unbounded Python integer model.",
+    "first_diagnostic_failures": {
+      "input_width": 8,
+      "shift_1": 127,
+      "shift_2": 126,
+      "shift_3": 124,
+      "interpretation": "Boundary diagnostics only; not paper performance results."
+    }
+  },
+  "changes": [
+    {
+      "id": "explicit-numeric-semantics",
+      "files": [
+        "examples/comm_dsp_bench/numeric_semantics.py",
+        "examples/comm_dsp_bench/search_ir/schema.py",
+        "examples/comm_dsp_bench/search_ir/architecture_plan.py",
+        "examples/comm_dsp_bench/search_ir/actions.py"
+      ],
+      "result": "New plans, constructors, and proposer domains use nearest_ties_to_pos_inf and floor. Historical aliases remain input-only compatibility values."
+    },
+    {
+      "id": "widened-rtl-rounding",
+      "files": [
+        "examples/comm_dsp_bench/search_ir/lower_rtl.py",
+        "examples/comm_dsp_bench/chains/ddc/rtl_gen.py"
+      ],
+      "result": "Signed rounding expressions sign-extend by one bit before adding the bias and shifting."
+    },
+    {
+      "id": "independent-boundary-reference",
+      "files": [
+        "tests/test_numeric_semantics.py"
+      ],
+      "result": "Quotient/remainder reference checks signed values, positive and negative ties, saturation, wrapping, sign extension, and compiled Verilog expressions without reusing the implementation algorithm."
+    },
+    {
+      "id": "historical-current-separation",
+      "files": [
+        "examples/comm_dsp_bench/search_ir/validate_main.py",
+        "examples/comm_dsp_bench/search_ir/formal_state.py",
+        "examples/comm_dsp_bench/search_ir/pilot.py",
+        "scripts/audit_ddc_pilot.py"
+      ],
+      "result": "Frozen Stage C and pilot artifacts remain read-only auditable through explicit legacy_v1 replay, while current cache and calibration paths reject the changed candidate or RTL identity."
+    }
+  ],
+  "verification": [
+    {
+      "command": "python3 -m pytest -q $(rg --files tests | rg '/test_search_ir_.*\\.py$') tests/test_numeric_semantics.py tests/test_cic_bittrue.py",
+      "exit_code": 0,
+      "observed_summary": "840 passed in 37.05s"
+    },
+    {
+      "command": "python3 examples/comm_dsp_bench/chains/ddc/rtl_equiv_test.py",
+      "exit_code": 0,
+      "observed_summary": "RTL_EQUIV: PASS; six legacy DDC candidates each reported mismatch=0/2016"
+    },
+    {
+      "command": "python3 scripts/audit_ddc_pilot.py examples/comm_dsp_bench/experiments_search/pilot/paired-pilot-v2-20261002",
+      "exit_code": 0,
+      "observed_summary": "72 state transitions replayed and 37 area sources checked under legacy_v1"
+    }
+  ],
+  "evidence_boundary": [
+    "The historical artifacts and paper numbers were not overwritten.",
+    "Historical area and calibration values are not reusable for the corrected RTL identity.",
+    "No PPA comparison or search-benefit claim is made from this correction.",
+    "Future synthesis, calibration, or search using the corrected generator requires a new run id."
+  ]
+}

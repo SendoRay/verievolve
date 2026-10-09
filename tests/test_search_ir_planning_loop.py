@@ -17,7 +17,7 @@ def _filter():
         "coefficient_bits": 14,
         "product_drop": 1,
         "accumulator_bits": 28,
-        "rounding": "rne",
+        "rounding": "nearest_ties_to_pos_inf",
     }
 
 
@@ -84,3 +84,68 @@ def test_capability_manifest_is_proposer_neutral_and_bounded():
     assert hybrid["residual"]["strategy"] == "cordic"
     assert hybrid["coarse"]["depth"] == [64, 128, 256, 512, 1024]
     assert manifest["filter_strategies"] == ["direct_symmetric", "polyphase"]
+    assert manifest["filter_numeric_domains"]["rounding"] == [
+        "nearest_ties_to_pos_inf",
+        "floor",
+    ]
+    assert manifest["numeric_semantics"]["legacy_aliases"] == {
+        "rne": "nearest_ties_to_pos_inf",
+        "trunc": "floor",
+    }
+
+
+def test_measured_candidate_rejection_is_fed_back_and_counted():
+    formula = ddc_formula_request()
+    seen = []
+
+    def proposer(context):
+        seen.append(copy.deepcopy(context))
+        return _plan(formula, 256 if context["attempt"] == 1 else 512)
+
+    def evaluator(candidate, request):
+        del request
+        depth = candidate["nco"]["depth"]
+        if depth == 256:
+            return {
+                "status": "rejected",
+                "measurements": {"Q_dev": 2e-4, "maximum": 1e-5},
+                "feedback": {"reason": "quality_limit", "observed": 2e-4},
+            }
+        return {
+            "status": "accepted",
+            "measurements": {"Q_dev": 5e-6, "maximum": 1e-5},
+            "feedback": None,
+        }
+
+    run = run_planning_loop(
+        formula, proposer, max_attempts=3, candidate_evaluator=evaluator
+    )
+    assert run["status"] == "success"
+    assert run["attempt_count"] == 2
+    assert run["failed_attempts"] == 1
+    assert run["evaluation_result"]["status"] == "accepted"
+    assert seen[1]["previous_feedback"]["code"] == "candidate_not_accepted"
+    assert seen[1]["previous_feedback"]["detail"]["measurements"]["Q_dev"] == 2e-4
+    assert run["transcript"][0]["candidate_evaluation"]["status"] == "rejected"
+
+
+def test_evaluator_exception_is_inconclusive_and_does_not_consume_more_proposals():
+    formula = ddc_formula_request()
+    calls = []
+
+    def proposer(context):
+        calls.append(context["attempt"])
+        return _plan(formula, 256)
+
+    def broken_evaluator(candidate, request):
+        del candidate, request
+        raise RuntimeError("tool unavailable")
+
+    run = run_planning_loop(
+        formula, proposer, max_attempts=3, candidate_evaluator=broken_evaluator
+    )
+    assert run["status"] == "inconclusive"
+    assert run["attempt_count"] == 1
+    assert run["failed_attempts"] == 0
+    assert calls == [1]
+    assert run["evaluation_result"]["feedback"]["code"] == "candidate_evaluator_exception"

@@ -187,6 +187,7 @@ def evaluate_candidate(candidate: Mapping[str, Any], cases: Sequence[DevCase]) -
         "schema_version": "search-ir-dev-evaluation-v1",
         "candidate_hash": candidate_hash(candidate),
         "scope": "development-only; not Q_main or an S/R gate",
+        "evidence_role": "development_only",
         "coefficients": {"values": hq.tolist(), **array_identity(hq)},
         "fir_mask": mask,
         "deployment_feasibility": "pending" if mask["legal"] else "failed",

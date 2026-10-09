@@ -27,7 +27,7 @@ def _plan(formula, depth):
             "coefficient_bits": 14,
             "product_drop": 1,
             "accumulator_bits": 28,
-            "rounding": "rne",
+            "rounding": "nearest_ties_to_pos_inf",
         },
     )
 
@@ -73,3 +73,70 @@ def test_surrounding_prose_is_rejected_and_retained():
 def test_json_extractor_allows_only_exact_object_or_one_fence():
     assert extract_json_payload('{"x": 1}') == '{"x": 1}'
     assert extract_json_payload('```json\n{"x": 1}\n```') == '{"x": 1}'
+
+
+def test_real_adapter_continues_after_measured_candidate_rejection():
+    formula = ddc_formula_request()
+    llm = ScriptedLLM([
+        json.dumps(_plan(formula, 256)),
+        json.dumps(_plan(formula, 512)),
+    ])
+
+    async def evaluator(candidate, request):
+        del request
+        if candidate["nco"]["depth"] == 256:
+            return {
+                "status": "rejected",
+                "measurements": {"Q_dev": 3e-4},
+                "feedback": {"reason": "quality_limit"},
+            }
+        return {"status": "accepted", "measurements": {"Q_dev": 4e-6}}
+
+    result = asyncio.run(
+        run_llm_planning_loop(
+            formula, llm, max_attempts=3, candidate_evaluator=evaluator
+        )
+    )
+    assert result["status"] == "success"
+    assert result["attempt_count"] == 2
+    assert result["evaluation_result"]["status"] == "accepted"
+    second_prompt = llm.calls[1]["messages"][0]["content"]
+    assert "candidate_not_accepted" in second_prompt
+    assert "quality_limit" in second_prompt
+
+
+def test_real_adapter_resumes_after_committed_rejection_without_recalling_it():
+    formula = ddc_formula_request()
+    recorded = []
+    first_llm = ScriptedLLM([json.dumps(_plan(formula, 256))])
+    first = asyncio.run(
+        run_llm_planning_loop(
+            formula,
+            first_llm,
+            max_attempts=1,
+            candidate_evaluator=lambda *_: {
+                "status": "rejected",
+                "measurements": {"Q_dev": 3e-4},
+                "feedback": {"reason": "quality_limit"},
+            },
+            attempt_recorder=recorded.append,
+        )
+    )
+    assert first["status"] == "exhausted" and len(recorded) == 1
+
+    second_llm = ScriptedLLM([json.dumps(_plan(formula, 512))])
+    resumed = asyncio.run(
+        run_llm_planning_loop(
+            formula,
+            second_llm,
+            max_attempts=3,
+            candidate_evaluator=lambda *_: {
+                "status": "accepted", "measurements": {"Q_dev": 1e-6}
+            },
+            resume_transcript=recorded,
+        )
+    )
+    assert resumed["status"] == "success" and resumed["attempt_count"] == 2
+    assert len(first_llm.calls) == len(second_llm.calls) == 1
+    prompt = second_llm.calls[0]["messages"][0]["content"]
+    assert '"attempt": 2' in prompt and "quality_limit" in prompt

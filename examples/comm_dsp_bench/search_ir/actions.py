@@ -8,6 +8,12 @@ from typing import Any
 
 import numpy as np
 
+from numeric_semantics import (
+    FLOOR,
+    NEAREST_TIES_TO_POS_INF,
+    normalize_rounding_mode,
+)
+
 from .schema import cordic_sincos, lut_sincos, phasor_compose
 from .validate import IRValidationError, validate_candidate
 
@@ -24,9 +30,15 @@ DOMAINS = {
     "coefficient_bits": tuple(range(8, 25)),
     "product_drop": tuple(range(9)),
     "accumulator_bits": (0, *range(20, 49)),
+    "rounding": (NEAREST_TIES_TO_POS_INF, FLOOR),
+    "product_rounding": (NEAREST_TIES_TO_POS_INF, FLOOR),
+}
+LEGACY_V1_DOMAINS = {
+    **DOMAINS,
     "rounding": ("rne", "trunc"),
     "product_rounding": ("rne", "trunc"),
 }
+SEMANTIC_PROFILES = ("current", "legacy_v1")
 
 
 class ActionError(ValueError):
@@ -87,13 +99,27 @@ def _structure_paths(tree: dict, kind: str) -> list[str]:
     raise ActionError(f"未知结构动作：{kind}")
 
 
-def _structure_after(kind: str, before):
+def _domains(semantic_profile: str) -> dict:
+    if semantic_profile not in SEMANTIC_PROFILES:
+        raise ValueError(f"unknown semantic profile: {semantic_profile}")
+    return LEGACY_V1_DOMAINS if semantic_profile == "legacy_v1" else DOMAINS
+
+
+def _structure_after(kind: str, before, semantic_profile: str = "current"):
     if kind == "swap_leaf":
         if before["kind"] == "lut_sincos":
             return cordic_sincos(12, before["phase_bits"])
         return lut_sincos(256, "linear", before["phase_bits"])
     if kind == "wrap_compose":
-        return phasor_compose(before, cordic_sincos(12, 16), 8, "rne")
+        result = phasor_compose(
+            before,
+            cordic_sincos(12, 16),
+            8,
+            NEAREST_TIES_TO_POS_INF,
+        )
+        if semantic_profile == "legacy_v1":
+            result["product_rounding"] = "rne"
+        return result
     if kind == "unwrap_compose":
         return deepcopy(before["coarse"])
     if kind == "swap_fir":
@@ -121,7 +147,9 @@ def _numeric_paths(tree: dict) -> list[str]:
     return sorted(paths)
 
 
-def _sample_step(tree: dict, rng, phase: str, log: dict) -> None:
+def _sample_step(
+    tree: dict, rng, phase: str, log: dict, semantic_profile: str = "current"
+) -> None:
     family = phase if phase != "mixed" else _pick(("structure", "numeric"), rng)
     log["family"] = family
     if family == "structure":
@@ -133,15 +161,16 @@ def _sample_step(tree: dict, rng, phase: str, log: dict) -> None:
         if kind == "change_interpolation":
             log["after"] = _pick([x for x in INTERPOLATIONS if x != before], rng)
         else:
-            log["after"] = _structure_after(kind, before)
+            log["after"] = _structure_after(kind, before, semantic_profile)
         return
     log.update(kind="numeric", path=_pick(_numeric_paths(tree), rng))
     field = log["path"].rsplit("/", 1)[1]
     before = deepcopy(_get(tree, log["path"]))
     log["before"] = before
-    values = DOMAINS[field]
+    values = _domains(semantic_profile)[field]
     if field in ("rounding", "product_rounding"):
-        log.update(mode="toggle", after=next(x for x in values if x != before))
+        current = before if semantic_profile == "legacy_v1" else normalize_rounding_mode(before)
+        log.update(mode="toggle", after=next(x for x in values if x != current))
     elif field == "accumulator_bits":
         log.update(mode="uniform", after=_pick([x for x in values if x != before], rng))
     elif rng.random() < 0.8:
@@ -153,7 +182,7 @@ def _sample_step(tree: dict, rng, phase: str, log: dict) -> None:
         log.update(mode="jump", after=_pick([x for x in values if x != before], rng))
 
 
-def _apply(tree: dict, log: dict) -> None:
+def _apply(tree: dict, log: dict, semantic_profile: str = "current") -> None:
     if log.get("status") == "error":
         raise ActionError("不能回放含失败步骤的提案")
     kind, path = log["kind"], log["path"]
@@ -166,15 +195,18 @@ def _apply(tree: dict, log: dict) -> None:
         if kind == "change_interpolation":
             if not isinstance(after, str) or after not in INTERPOLATIONS or after == before:
                 raise ActionError("插值切换必须选择另一合法类别")
-        elif not _same(after, _structure_after(kind, before)):
+        elif not _same(after, _structure_after(kind, before, semantic_profile)):
             raise ActionError("结构动作违反字段继承或固定默认值")
     elif kind == "numeric":
         if log.get("family") != "numeric" or path not in _numeric_paths(tree):
             raise ActionError("数值动作目标不在允许参数集合")
         field = path.rsplit("/", 1)[1]
-        values = DOMAINS[field]
+        values = _domains(semantic_profile)[field]
         expected_type = str if field in ("rounding", "product_rounding") else int
-        if type(after) is not expected_type or after not in values or after == before:
+        same_value = after == before
+        if expected_type is str and type(after) is str and type(before) is str:
+            same_value = normalize_rounding_mode(after) == normalize_rounding_mode(before)
+        if type(after) is not expected_type or after not in values or same_value:
             raise ActionError("数值动作越界、类型错误或未改变参数")
         mode = log.get("mode")
         if expected_type is str:
@@ -194,10 +226,17 @@ def _apply(tree: dict, log: dict) -> None:
     validate_candidate(tree)
 
 
-def propose(candidate: dict, rng: np.random.Generator, phase: str) -> dict[str, Any]:
+def propose(
+    candidate: dict,
+    rng: np.random.Generator,
+    phase: str,
+    *,
+    semantic_profile: str = "current",
+) -> dict[str, Any]:
     """产生1或2步提案；任一步失败返回None，同时保留已经尝试的动作。"""
     if phase not in ("mixed", "structure", "numeric"):
         raise ValueError("phase 必须为 mixed/structure/numeric")
+    _domains(semantic_profile)
     tree = deepcopy(candidate)
     actions = []
     try:
@@ -210,8 +249,8 @@ def propose(candidate: dict, rng: np.random.Generator, phase: str) -> dict[str, 
         log = {"kind": None, "family": None, "path": None, "before": None, "after": None,
                "rng_before": deepcopy(rng.bit_generator.state)}
         try:
-            _sample_step(tree, rng, phase, log)
-            _apply(tree, log)
+            _sample_step(tree, rng, phase, log, semantic_profile)
+            _apply(tree, log, semantic_profile)
             log["status"] = "ok"
         except (ActionError, IRValidationError) as exc:
             log.update(status="error", error=str(exc))
@@ -223,17 +262,20 @@ def propose(candidate: dict, rng: np.random.Generator, phase: str) -> dict[str, 
     return {"candidate": tree, "actions": actions, "error": None}
 
 
-def replay(candidate: dict, actions: list[dict]) -> dict:
+def replay(
+    candidate: dict, actions: list[dict], *, semantic_profile: str = "current"
+) -> dict:
     """严格回放合法日志；不抽随机数，不接受改变契约的伪造patch。"""
     if not isinstance(actions, list) or len(actions) not in (1, 2):
         raise ActionError("回放必须恰有1或2个动作")
     tree = deepcopy(candidate)
+    _domains(semantic_profile)
     validate_candidate(tree)
     for log in actions:
         if not isinstance(log, dict) or log.get("status") != "ok":
             raise ActionError("回放只接受成功动作日志")
         try:
-            _apply(tree, log)
+            _apply(tree, log, semantic_profile)
         except (KeyError, TypeError, ValueError) as exc:
             raise ActionError(f"无效回放日志：{exc}") from exc
     return tree

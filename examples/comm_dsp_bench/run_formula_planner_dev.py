@@ -23,7 +23,18 @@ sys.path.insert(0, str(BENCH))
 
 from openevolve.config import LLMModelConfig
 from openevolve.llm.ensemble import LLMEnsemble
-from search_ir import ddc_formula_request, lower_ddc_rtl, run_llm_planning_loop
+from search_ir import (
+    DevelopmentSynthesisEvaluator,
+    PlanningRunArchive,
+    ddc_formula_request,
+    evaluate_with_optional_synthesis,
+    run_llm_planning_loop,
+)
+from search_ir import synthesize as synth
+from search_ir.dev_fixtures import (
+    development_candidate_evaluator,
+    development_evaluation_contract,
+)
 
 
 def _arguments() -> argparse.Namespace:
@@ -36,12 +47,28 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--attempts", type=int, default=3)
     parser.add_argument("--timeout", type=int, default=300)
     parser.add_argument("--max-budget-usd", type=float, default=0.25)
+    parser.add_argument(
+        "--synthesize", action="store_true",
+        help="map a quality-accepted candidate with the frozen Nangate45 flow",
+    )
+    parser.add_argument("--synthesis-timeout", type=int, default=600)
+    parser.add_argument("--max-syntheses", type=int, default=1)
     parser.add_argument("--run-id", default=None)
+    parser.add_argument(
+        "--resume", action="store_true",
+        help="continue a nonterminal run from its last fully committed attempt",
+    )
+    parser.add_argument(
+        "--plan-only", action="store_true",
+        help="stop after schema/lowering checks instead of using measured development feedback",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = _arguments()
+    if args.resume and not args.run_id:
+        raise SystemExit("--resume requires --run-id")
     api_key = None
     if args.provider == "openai":
         api_key = os.environ.get(args.api_key_env)
@@ -68,37 +95,77 @@ def main() -> int:
     )
     llm = LLMEnsemble([model])
     formula = ddc_formula_request()
-    result = asyncio.run(
-        run_llm_planning_loop(formula, llm, max_attempts=args.attempts)
-    )
-
+    synthesis_contract = None
+    if args.synthesize:
+        if args.plan_only:
+            raise SystemExit("--synthesize cannot be combined with --plan-only")
+        if args.synthesis_timeout < 1 or args.max_syntheses < 1:
+            raise SystemExit("synthesis timeout and budget must be positive")
+        synthesis_contract = synth.build_contract()
+        synthesis_contract.update({
+            "scope": "development formula-planner candidate; full-DDC mapped cell area",
+            "cache_enabled": True,
+            "resume_enabled": True,
+            "timeout_seconds": args.synthesis_timeout,
+        })
     run_id = args.run_id or datetime.now(timezone.utc).strftime("dev-%Y%m%dT%H%M%SZ")
-    output = BENCH / "experiments_system" / "formula_to_rtl_dev" / run_id
-    output.mkdir(parents=True, exist_ok=False)
-    manifest = {
-        "status": "development_only",
-        "created_utc": datetime.now(timezone.utc).isoformat(),
+    output_root = BENCH / "experiments_system" / "formula_to_rtl_dev"
+    metadata = {
         "provider": args.provider,
         "model": args.model,
-        "max_attempts": args.attempts,
-        "formula_request": formula,
-        "result": result,
+        "planning_mode": "plan_only" if args.plan_only else "measured_quality_feedback",
+        "timeout_seconds": args.timeout,
+        "max_budget_usd": args.max_budget_usd,
+        "synthesis_enabled": args.synthesize,
     }
-    (output / "result.json").write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    archive = PlanningRunArchive(
+        output_root,
+        run_id,
+        formula,
+        max_attempts=args.attempts,
+        evaluation_contract=(
+            None if args.plan_only else development_evaluation_contract()
+        ),
+        synthesis_contract=synthesis_contract,
+        max_synthesis_evaluations=args.max_syntheses if args.synthesize else 0,
+        run_metadata=metadata,
+        resume=args.resume,
     )
-    if result["status"] == "success":
-        candidate = result["compile_result"]["candidate"]
-        (output / "candidate.json").write_text(
-            json.dumps(candidate, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    synthesis_evaluator = None
+    if synthesis_contract is not None:
+        synthesis_evaluator = (
+            DevelopmentSynthesisEvaluator.resume(archive.path, synthesis_contract)
+            if args.resume
+            else DevelopmentSynthesisEvaluator(archive.path, synthesis_contract)
         )
-        (output / "design.v").write_text(lower_ddc_rtl(candidate), encoding="utf-8")
+    evaluator = None
+    if not args.plan_only:
+        evaluator = lambda candidate, request: evaluate_with_optional_synthesis(
+            candidate,
+            request,
+            archive=archive,
+            quality_evaluator=development_candidate_evaluator,
+            synthesis_evaluator=synthesis_evaluator,
+        )
+    result = asyncio.run(
+        run_llm_planning_loop(
+            formula,
+            llm,
+            max_attempts=args.attempts,
+            candidate_evaluator=evaluator,
+            resume_transcript=archive.transcript(),
+            attempt_recorder=archive.record_attempt,
+        )
+    )
+    archive.finalize(result)
+    if result["status"] == "success":
+        archive.export_selected()
     print(json.dumps({
         "status": result["status"],
         "attempt_count": result["attempt_count"],
-        "output": str(output.relative_to(ROOT)),
+        "output": str(archive.path.relative_to(ROOT)),
     }, ensure_ascii=False))
-    return 0 if result["status"] == "success" else 2
+    return {"success": 0, "inconclusive": 3}.get(result["status"], 2)
 
 
 if __name__ == "__main__":

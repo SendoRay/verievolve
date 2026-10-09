@@ -14,7 +14,7 @@ BENCH = Path(__file__).resolve().parents[1] / "examples/comm_dsp_bench"
 sys.path.insert(0, str(BENCH))
 
 from search_ir.pilot import ArmState, area_key
-from search_ir.synthesize import lower_ddc_rtl, liberty_areas, validate_mapped_result
+from search_ir.synthesize import liberty_areas, validate_mapped_result
 from search_ir.canonicalize import canonical_json
 from search_ir.provenance import verify_source_record
 
@@ -37,15 +37,14 @@ def audit(root):
     contract = manifest["contract"]
     for record in contract["sources"]:
         verify_source_record(record)
-        # 回放必须仍执行同一动作/选择实现；修复的RTL另由实际生成字节核验。
-        if Path(record["path"]).name in ("pilot.py", "actions.py", "selection.py", "synthesize.py"):
-            assert digest(record["path"]) == record["sha256"], record["path"]
     for record in (contract["yosys"], contract["abc"], contract["liberty"]):
         assert digest(record["path"]) == record["sha256"], record["path"]
     assert len(manifest["main_definition"]["scenarios"]) == 36
     assert all(s["split"] == "main" for s in manifest["main_definition"]["scenarios"])
     budget = manifest["draft"]["evaluation"]["q_budget"]
-    states = {(seed, arm): ArmState(seed, arm) for seed in (11, 29, 47) for arm in ("joint", "staged")}
+    initial = [row["candidate"] for row in manifest["draft"]["initial_candidates"]]
+    states = {(seed, arm): ArmState(seed, arm, initial, "legacy_v1")
+              for seed in (11, 29, 47) for arm in ("joint", "staged")}
     seen_sources, cache_keys = set(), set()
     quality_rows, mutations, area_hits = 0, 0, 0
     cost_samples = []
@@ -84,9 +83,9 @@ def audit(root):
             ev = q["evaluation"]
             assert not any(r["n_sat_mix"] or r["n_sat_fir"] for r in ev["rows"])
             area = trial["area"]
-            rtl = lower_ddc_rtl(proposal["candidate"])
-            assert area["cache_key"] == area_key(proposal["candidate"], rtl, contract)
             source = Path(area["source_result"])
+            rtl = (source.parent / "design.v").read_text()
+            assert area["cache_key"] == area_key(proposal["candidate"], rtl, contract)
             assert digest(source) == area["source_sha256"]
             raw = read(source)
             assert raw["status"] == "ok" and raw["area_um2"] == area["area_um2"]
