@@ -159,55 +159,60 @@ def fig_chain():
 
 
 def fig_system():
-    """图 2：系统架构（闭环）。"""
-    fig, ax = canvas(11.6, 4.9)
-    yt, yb = 3.55, 1.15
+    """图 2：系统架构（两层搜索闭环）。"""
+    fig, ax = canvas(13.2, 5.6)
+    yt, yb = 3.95, 1.15
 
-    box(ax, 1.15, yt, 1.7, 1.25, "", GRAY, "#ffffff")
-    ax.text(1.15, yt + 0.42, "规格（人写）", ha="center", fontsize=9.5, color=INK, fontweight="bold")
-    ax.text(1.15, yt - 0.08, "公式 F\n指标 M\n允许空间 T", ha="center", va="center", fontsize=9, color=INK2, linespacing=1.4)
+    # 两层的底色带
+    ax.add_patch(FancyBboxPatch((2.25, yt - 0.72), 4.7, 1.62, boxstyle="round,pad=0,rounding_size=0.12", ec=VIOLET, fc="#f6f4fc", lw=1.2, ls="--", zorder=0))
+    ax.text(4.6, yt + 0.68, "外层：结构搜索（LLM，持续探索，不冻结）", ha="center", fontsize=9.5, color=VIOLET, fontweight="bold")
+    ax.add_patch(FancyBboxPatch((7.15, yt - 1.05), 4.05, 1.95, boxstyle="round,pad=0,rounding_size=0.12", ec=ORANGE, fc="#fff6f1", lw=1.2, ls="--", zorder=0))
+    ax.text(9.17, yt + 0.68, "内层：实现调优与评价（确定性）", ha="center", fontsize=9.5, color=ORANGE, fontweight="bold")
 
-    box(ax, 3.1, yt, 1.3, 0.75, "提示词生成", BLUE, BLUE_T)
-    box(ax, 4.75, yt, 1.0, 0.75, "LLM", VIOLET, VIOLET_T, bold=True, fs=11)
-    box(ax, 6.3, yt, 1.2, 0.75, "原语程序\ndiff", AQUA, AQUA_T)
+    box(ax, 1.1, yt, 1.6, 1.25, "", GRAY, "#ffffff")
+    ax.text(1.1, yt + 0.42, "规格（人写）", ha="center", fontsize=9.5, color=INK, fontweight="bold")
+    ax.text(1.1, yt - 0.08, "公式 F\n指标 M\n允许空间 T", ha="center", va="center", fontsize=9, color=INK2, linespacing=1.4)
 
-    # 评价系统
-    ax.add_patch(FancyBboxPatch((7.35, yt - 0.82), 2.95, 1.75, boxstyle="round,pad=0,rounding_size=0.1", ec=ORANGE, fc="#fff6f1", lw=1.4, ls="--", zorder=1))
-    ax.text(8.82, yt + 0.72, "固定评价系统（与算子无关）", ha="center", fontsize=9.5, color=INK, fontweight="bold")
-    for x, t, s in [(7.9, "编译器", "Verilog\n整数模型"), (8.82, "裁判", "搜索场景\n留出场景"), (9.75, "诊断", "溢出定位\n位宽加宽重跑")]:
-        box(ax, x, yt + 0.08, 0.84, 0.5, t, ORANGE, ORANGE_T, fs=9.5)
-        ax.text(x, yt - 0.45, s, ha="center", va="center", fontsize=7.5, color=INK2, linespacing=1.3)
-    arrow(ax, (8.32, yt + 0.08), (8.4, yt + 0.08))
-    arrow(ax, (9.24, yt + 0.08), (9.33, yt + 0.08))
+    box(ax, 3.05, yt, 1.2, 0.7, "提示词生成", BLUE, BLUE_T, fs=9)
+    box(ax, 4.55, yt, 0.95, 0.7, "LLM", VIOLET, VIOLET_T, bold=True, fs=11)
+    box(ax, 6.0, yt, 1.3, 0.7, "结构变换\n（程序 diff）", AQUA, AQUA_T, fs=9)
+    ax.text(4.55, yt - 0.56, "多级抽取、查表结构、多相……", ha="center", fontsize=7.5, color=INK2)
 
-    arrow(ax, (2.0, yt), (2.45, yt))
-    arrow(ax, (3.75, yt), (4.25, yt))
-    arrow(ax, (5.25, yt), (5.7, yt))
-    arrow(ax, (6.9, yt), (7.35, yt))
+    box(ax, 7.95, yt + 0.12, 1.25, 0.66, "位宽 / 复用\n小预算调优", ORANGE, ORANGE_T, fs=8.5)
+    box(ax, 9.3, yt + 0.12, 0.95, 0.66, "编译器", ORANGE, ORANGE_T, fs=9)
+    box(ax, 10.55, yt + 0.12, 0.95, 0.66, "裁判", ORANGE, ORANGE_T, fs=9)
+    ax.text(9.3, yt - 0.48, "Verilog\n整数模型", ha="center", va="center", fontsize=7.5, color=INK2, linespacing=1.3)
+    ax.text(10.55, yt - 0.48, "搜索 + 留出场景\n安全裕量 0.3 dB", ha="center", va="center", fontsize=7.5, color=INK2, linespacing=1.3)
+    arrow(ax, (8.58, yt + 0.12), (8.82, yt + 0.12))
+    arrow(ax, (9.78, yt + 0.12), (10.07, yt + 0.12))
+    arrow(ax, (10.55, yt - 0.21), (7.95, yt - 0.21), rad=0.35, color=ORANGE)
+    ax.text(9.25, yt - 0.86, "每次调优都重新过裁判", ha="center", fontsize=7.5, color=ORANGE)
 
-    # 输出
-    box(ax, 10.95, yt + 0.55, 1.1, 0.72, "最优设计\nVerilog + PPA", AQUA, AQUA_T, fs=8.5)
-    arrow(ax, (10.3, yt + 0.55), (10.4, yt + 0.55))
+    arrow(ax, (1.9, yt), (2.45, yt))
+    arrow(ax, (3.65, yt), (4.07, yt))
+    arrow(ax, (5.03, yt), (5.35, yt))
+    arrow(ax, (6.65, yt), (7.32, yt + 0.05))
+
+    box(ax, 12.35, yt + 0.12, 1.25, 0.72, "最优设计\nVerilog + PPA", AQUA, AQUA_T, fs=8.5)
+    arrow(ax, (11.2, yt + 0.12), (11.72, yt + 0.12))
 
     # 下方回路
-    box(ax, 8.82, yb, 2.3, 0.95, "", VIOLET, VIOLET_T)
-    ax.text(8.82, yb + 0.26, "种群档案", ha="center", fontsize=9.5, color=INK, fontweight="bold")
+    box(ax, 9.3, yb, 2.3, 0.95, "", VIOLET, VIOLET_T)
+    ax.text(9.3, yb + 0.26, "种群档案（Pareto）", ha="center", fontsize=9.5, color=INK, fontweight="bold")
     for i, (c, a) in enumerate([(BLUE, 0.25), (BLUE, 0.45), (BLUE, 0.7), (BLUE, 1.0), (GRAY, 0.5), (BLUE, 0.55)]):
-        ax.scatter([8.0 + i * 0.33], [yb - 0.16], s=110, color=c, alpha=a, edgecolor="white", linewidth=1, zorder=4)
-    box(ax, 5.55, yb, 2.0, 0.95, "", BLUE, BLUE_T, dashed=True)
-    ax.text(5.55, yb + 0.26, "选择父代", ha="center", fontsize=9.5, color=INK, fontweight="bold")
-    ax.text(5.55, yb - 0.14, "多岛 + MAP-Elites\n精英与多样性", ha="center", va="center", fontsize=8, color=INK2, linespacing=1.3)
-    box(ax, 2.6, yb, 1.9, 0.95, "父代程序\n+ 上一轮的反馈", AQUA, AQUA_T)
-    box(ax, 11.0, yb, 1.0, 0.7, "直写起点\n（自动达标）", GRAY, GRAY_T, fs=8)
+        ax.scatter([8.48 + i * 0.33], [yb - 0.16], s=110, color=c, alpha=a, edgecolor="white", linewidth=1, zorder=4)
+    box(ax, 5.9, yb, 2.0, 0.95, "", BLUE, BLUE_T, dashed=True)
+    ax.text(5.9, yb + 0.26, "选择父代", ha="center", fontsize=9.5, color=INK, fontweight="bold")
+    ax.text(5.9, yb - 0.14, "多岛 + MAP-Elites\n精英与多样性", ha="center", va="center", fontsize=8, color=INK2, linespacing=1.3)
+    box(ax, 2.85, yb, 1.95, 0.95, "父代程序\n+ 指标数值反馈", AQUA, AQUA_T)
+    box(ax, 12.35, yb, 1.15, 0.7, "直写起点\n（自动生成）", GRAY, GRAY_T, fs=8)
 
-    arrow(ax, (8.82, yt - 0.82), (8.82, yb + 0.475))
-    ax.text(8.95, 2.2, "达标与否、代价、失败原因", fontsize=8.5, color=INK2, va="center")
-    arrow(ax, (7.67, yb), (6.55, yb))
-    arrow(ax, (4.55, yb), (3.55, yb))
-    arrow(ax, (2.6, yb + 0.475), (3.0, yt - 0.375), rad=-0.15)
-    arrow(ax, (10.5, yb), (9.97, yb), dashed=True)
-
-    ax.text(4.75, yt + 0.62, "数学变换在这里发生", ha="center", fontsize=8.5, color=VIOLET)
+    arrow(ax, (9.3, yt - 1.05), (9.3, yb + 0.475))
+    ax.text(9.45, 2.4, "调优后的面积、裕量、逐段指标", fontsize=8.5, color=INK2, va="center")
+    arrow(ax, (8.15, yb), (6.9, yb))
+    arrow(ax, (4.9, yb), (3.83, yb))
+    arrow(ax, (2.85, yb + 0.475), (3.0, yt - 0.35), rad=-0.15)
+    arrow(ax, (11.77, yb), (10.45, yb), dashed=True)
     save(fig, "fig2_system")
 
 

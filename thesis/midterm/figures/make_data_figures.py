@@ -248,9 +248,9 @@ def fig_curves():
 
 def fig_feedback():
     """挑战三：反馈档位。"""
-    rows = load("analysis_p3_v3_judge2_20261010.json")["p3_rows"]
+    rows = load("groupA_v1_20261011/A3_feedback_4seeds_analysis.json")["rows"]
     modes = ["scalar", "metrics", "verified"]
-    names = ["只给分数", "给全部指标", "加经验证的诊断"]
+    names = ["只给分数", "给全部指标", "再加诊断归因"]
     by = defaultdict(dict)
     for r in rows:
         by[(r["spec"], r["seed"])][r["mode"]] = r["rel"]
