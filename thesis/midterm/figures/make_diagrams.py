@@ -169,9 +169,9 @@ def fig_system():
     ax.add_patch(FancyBboxPatch((7.15, yt - 1.05), 4.05, 1.95, boxstyle="round,pad=0,rounding_size=0.12", ec=ORANGE, fc="#fff6f1", lw=1.2, ls="--", zorder=0))
     ax.text(9.17, yt + 0.68, "内层：实现调优与评价（确定性）", ha="center", fontsize=9.5, color=ORANGE, fontweight="bold")
 
-    box(ax, 1.1, yt, 1.6, 1.25, "", GRAY, "#ffffff")
+    box(ax, 1.1, yt, 1.72, 1.34, "", GRAY, "#ffffff")
     ax.text(1.1, yt + 0.42, "规格（人写）", ha="center", fontsize=9.5, color=INK, fontweight="bold")
-    ax.text(1.1, yt - 0.08, "公式 F\n指标 M\n允许空间 T", ha="center", va="center", fontsize=9, color=INK2, linespacing=1.4)
+    ax.text(1.1, yt - 0.10, "计算图 G\n设计边界 B\n指标 M + 允许空间 T", ha="center", va="center", fontsize=8.2, color=INK2, linespacing=1.35)
 
     box(ax, 3.05, yt, 1.2, 0.7, "提示词生成", BLUE, BLUE_T, fs=9)
     box(ax, 4.55, yt, 0.95, 0.7, "LLM", VIOLET, VIOLET_T, bold=True, fs=11)
@@ -227,61 +227,104 @@ def code_box(ax, x, y, w, h, title, lines, ec, hi=()):
 
 
 def fig_method():
-    """图 3：LLM 如何参与变换。"""
-    fig, ax = canvas(11.6, 5.0)
+    """图 4：数学计算图、可执行 IR 与确定性后端。"""
+    fig, ax = canvas(13.2, 6.2)
 
-    # (a) 一次变换
-    ax.text(0.15, 4.78, "(a) 一次变换：LLM 改写原语程序，两种解释分别用于判定和计价", fontsize=10, color=INK, fontweight="bold", va="center")
-    code_box(
-        ax, 0.2, 2.75, 2.75, 1.72, "父代程序",
-        ["d = g.delay_line(x, 96)", "y = g.mac(zip(d, h))", "y = g.decimate(y, 16)", "g.output(g.q(y, 16, 15))"],
-        GRAY, hi=(1, 2),
-    )
-    code_box(
-        ax, 4.35, 2.75, 3.05, 1.72, "子代程序",
-        ["x4 = g.decimate(fir(x, h1), 4)", "x4 = g.decimate(fir(x4, h2), 4)", "y  = g.mac(zip(taps(x4), h3))", "g.output(g.q(y, 16, 15))"],
-        BLUE, hi=(0, 1),
-    )
-    arrow(ax, (2.95, 3.6), (4.35, 3.6), color=VIOLET, lw=1.8)
-    ax.text(3.65, 3.98, "LLM", ha="center", fontsize=10, color=VIOLET, fontweight="bold")
-    ax.text(3.65, 3.74, "单级 → 两级抽取", ha="center", fontsize=8, color=INK2)
-    ax.text(3.65, 3.38, "近似变换", ha="center", fontsize=8, color=INK2)
-    ax.text(4.42, 2.6, "示意：fir、taps 是 delay_line + mac 的简写", fontsize=7.5, color=INK2, va="center")
-
-    box(ax, 8.55, 4.12, 1.75, 0.6, "浮点解释", AQUA, AQUA_T, sub="数学行为", fs=9.5)
-    box(ax, 8.55, 3.1, 1.75, 0.6, "定点解释", ORANGE, ORANGE_T, sub="Verilog（逐位一致）", fs=9.5)
-    arrow(ax, (7.4, 3.75), (7.67, 4.12), rad=-0.2)
-    arrow(ax, (7.4, 3.45), (7.67, 3.1), rad=0.2)
-    box(ax, 10.6, 4.12, 1.7, 0.6, "落在允许空间 T 内？", AQUA, "#ffffff", fs=8.5)
-    box(ax, 10.6, 3.1, 1.7, 0.6, "面积 / 时序 / 功耗", ORANGE, "#ffffff", fs=8.5)
-    arrow(ax, (9.43, 4.12), (9.75, 4.12))
-    arrow(ax, (9.43, 3.1), (9.75, 3.1))
-
-    ax.plot([0.15, 11.45], [2.5, 2.5], color="#d9d8d3", lw=1)
-
-    # (b) 进化树
-    ax.text(0.15, 2.27, "(b) 多次变换的积累：一条真实的演化路径（R32 宽带，数字为面积 / 直写起点）", fontsize=10, color=INK, fontweight="bold", va="center")
-    ys = 1.15
-    nodes = [
-        (0.9, "1.000", "直写起点", GRAY, 1.0, False),
-        (3.2, "4.056", "多相分解\n（未达标）", GRAY, 1.0, True),
-        (5.5, "0.243", "两级抽取 + 多相", BLUE, 0.4, False),
-        (7.8, "0.138", "1/4 波查表\n+ 三级抽取 8×2×2", BLUE, 0.7, False),
-        (10.1, "0.129", "缩短字长", BLUE, 1.0, False),
+    # 三栏背景
+    panels = [
+        (0.18, 0.3, 3.78, 5.6, BLUE, "(a) 数学计算图与任务边界"),
+        (4.12, 0.3, 4.72, 5.6, VIOLET, "(b) 原语级可执行 IR（真实字段）"),
+        (9.02, 0.3, 4.0, 5.6, ORANGE, "(c) 同一 IR 的确定性后端"),
     ]
-    for i, (x, v, t, c, a, hollow) in enumerate(nodes):
-        ax.scatter([x], [ys], s=1500, color="#ffffff" if hollow else c, alpha=1.0 if hollow else a, edgecolor=c, linewidth=1.6, linestyle="--" if hollow else "-", zorder=3)
-        ax.text(x, ys, v, ha="center", va="center", fontsize=9.5, color=INK if (hollow or a < 0.6 or c == GRAY and False) else "#ffffff", zorder=4, fontweight="bold")
-        ax.text(x, ys - 0.62, t, ha="center", va="center", fontsize=8.5, color=INK, linespacing=1.3)
+    for x, y, w, h, ec, title in panels:
+        ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0,rounding_size=0.1",
+                                    ec=ec, fc="#ffffff", lw=1.25, zorder=0))
+        ax.text(x + 0.16, y + h - 0.25, title, fontsize=9.6, color=ec,
+                fontweight="bold", va="center")
+
+    # (a) 公式先成为有名字的计算图，边界来自任务契约而不是候选自己猜。
+    ax.text(2.07, 5.14,
+            r"$y[m]=\downarrow_R\{h*(x[n]e^{-j\phi[n]})\}$",
+            ha="center", va="center", fontsize=10, color=INK)
+    xs, yy = [0.58, 1.34, 2.14, 2.94, 3.60], 4.25
+    labels = ["x", "NCO", "混频", "FIR", "↓R"]
+    colors = [(GRAY, GRAY_T), (BLUE, BLUE_T), (AQUA, AQUA_T),
+              (ORANGE, ORANGE_T), (ORANGE, ORANGE_T)]
+    widths = [0.48, 0.62, 0.66, 0.58, 0.52]
+    for i, (x, label, (ec, fc), w) in enumerate(zip(xs, labels, colors, widths)):
+        box(ax, x, yy, w, 0.52, label, ec, fc, fs=8.2)
         if i:
-            arrow(ax, (nodes[i - 1][0] + 0.36, ys), (x - 0.36, ys), color=VIOLET, lw=1.6)
-            ax.text((nodes[i - 1][0] + x) / 2, ys + 0.17, f"变换 {i}", ha="center", fontsize=8, color=VIOLET)
-    # 被淘汰的旁支
-    for x0, dx in [(3.2, 0.9), (5.5, 0.9), (7.8, 0.9)]:
-        ax.scatter([x0 + dx], [ys + 0.72], s=260, color=GRAY_T, edgecolor=GRAY, linewidth=1, zorder=3)
-        arrow(ax, (x0 + 0.22, ys + 0.3), (x0 + dx - 0.14, ys + 0.62), color=GRAY, lw=1, dashed=True)
-    ax.text(9.85, ys + 0.72, "灰色小圆：被淘汰的其他候选", fontsize=8, color=INK2, va="center")
-    ax.text(0.15, 0.08, "面积的大幅下降来自结构变换（第 2、3 步）；进化可以穿过未达标的中间设计（第 1 步）。", fontsize=8.5, color=INK2)
+            arrow(ax, (xs[i - 1] + widths[i - 1] / 2, yy), (x - w / 2, yy), lw=1.0)
+    ax.add_patch(FancyBboxPatch((1.00, 3.76), 1.51, 0.98,
+                                boxstyle="round,pad=0,rounding_size=0.06",
+                                ec=VIOLET, fc="none", lw=1.4, ls="--", zorder=1))
+    ax.text(1.76, 3.63, "可变子图 Bvar（示例）", ha="center", fontsize=7.5,
+            color=VIOLET, fontweight="bold")
+    ax.add_patch(FancyBboxPatch((2.58, 3.76), 1.28, 0.98,
+                                boxstyle="round,pad=0,rounding_size=0.06",
+                                ec=GRAY, fc="none", lw=1.2, ls=":", zorder=1))
+    ax.text(3.22, 3.63, "冻结上下文 Bctx", ha="center", fontsize=7.2, color=INK2)
+    arrow(ax, (3.60, 3.98), (3.60, 3.22), color=AQUA, lw=1.2)
+    box(ax, 3.18, 2.92, 1.42, 0.48, "观测边界 Bobs", AQUA, AQUA_T, fs=8)
+    ax.text(3.18, 2.55, "链末 SNR / EVM / BER", ha="center", fontsize=7.4, color=INK2)
+    box(ax, 1.42, 2.92, 1.52, 0.48, "成本边界 Bcost", ORANGE, ORANGE_T, fs=8)
+    ax.text(1.42, 2.55, "只综合被设计的模块", ha="center", fontsize=7.4, color=INK2)
+    arrow(ax, (1.76, 3.76), (1.52, 3.17), color=ORANGE, lw=1.2)
+    ax.text(0.42, 1.95, "同一张图可形成三类任务：", fontsize=8.3, color=INK, fontweight="bold")
+    ax.text(0.50, 1.62, "1  单算子局部验收", fontsize=8.0, color=INK2)
+    ax.text(0.50, 1.32, "2  冻结链路中的算子设计", fontsize=8.0, color=INK2)
+    ax.text(0.50, 1.02, "3  整条子链联合设计", fontsize=8.0, color=INK2)
+    ax.text(0.42, 0.62, "边界写在任务契约中，不能由 LLM\n从公式或 scope 名称中猜测。",
+            fontsize=7.8, color=VIOLET, va="center", linespacing=1.35)
+
+    # (b) 当前主线实际持久化的是构造程序，运行时产生带类型图。
+    code_box(
+        ax, 4.30, 1.88, 4.35, 3.58, "build(g, spec)：公式的直写起点",
+        [
+            "x    = g.input()",
+            "ph   = g.counter(spec.fcw, 32)",
+            "addr = g.bits(ph, 31, 16)",
+            "c    = g.lut(addr, cos_table, 20, 18)",
+            "s    = g.lut(addr, sin_table, 20, 18)",
+            "i    = g.q(g.mul(x, c), 22, 20)",
+            "q    = g.q(g.neg(g.mul(x, s)), 22, 20)",
+            "i    = g.mac(zip(g.delay_line(i,N), h))",
+            "q    = g.mac(zip(g.delay_line(q,N), h))",
+            "i    = g.decimate(i, spec.r_total)",
+            "q    = g.decimate(q, spec.r_total)",
+            "g.output(g.q(i,b,b-1), g.q(q,b,b-1))",
+        ],
+        VIOLET, hi=(1, 2, 5, 7, 9, 11),
+    )
+    ax.text(4.36, 1.55, "运行时每根线都是 Sig：", fontsize=8.3, color=INK, fontweight="bold")
+    ax.text(4.48, 1.22, "W/F  位宽与小数位    signed  符号", fontsize=7.7,
+            color=INK2)
+    ax.text(4.48, 0.92, "lin   采样率域         lat     延迟", fontsize=7.7,
+            color=INK2)
+    ax.text(4.48, 0.62, "v     当前激励下的逐位整数值", fontsize=7.7,
+            color=INK2)
+
+    # (c) 当前编译器在建图时同步维护整数语义和 RTL。
+    box(ax, 11.02, 5.08, 1.70, 0.56, "带类型数据流图", VIOLET, VIOLET_T,
+        sub="结构 + 定点 + 速率 + 状态", fs=9)
+    box(ax, 10.10, 3.86, 1.58, 0.66, "逐位整数解释", AQUA, AQUA_T,
+        sub="同一激励下精确执行", fs=8.7)
+    box(ax, 11.96, 3.86, 1.46, 0.66, "Verilog 后端", ORANGE, ORANGE_T,
+        sub="自动对齐 valid / 延迟", fs=8.7)
+    arrow(ax, (10.72, 4.80), (10.24, 4.20), color=AQUA)
+    arrow(ax, (11.32, 4.80), (11.83, 4.20), color=ORANGE)
+    box(ax, 10.10, 2.66, 1.58, 0.62, "链级质量判定", AQUA, "#ffffff",
+        sub="在 Bobs 计算 M ∈ T？", fs=8.5)
+    box(ax, 11.96, 2.66, 1.46, 0.62, "综合与 PPA", ORANGE, "#ffffff",
+        sub="只统计 Bcost", fs=8.5)
+    arrow(ax, (10.10, 3.53), (10.10, 2.97))
+    arrow(ax, (11.96, 3.53), (11.96, 2.97))
+    box(ax, 11.02, 1.55, 2.58, 0.66, "RTL ↔ 整数模型逐位对拍", BLUE, BLUE_T,
+        sub="候选不能自己宣布正确", fs=9)
+    arrow(ax, (10.10, 2.34), (10.62, 1.88), color=BLUE)
+    arrow(ax, (11.96, 2.34), (11.42, 1.88), color=BLUE)
+    ax.text(9.30, 0.92, "当前持久化：构造程序源码", fontsize=8.0, color=INK2)
+    ax.text(9.30, 0.62, "当前运行态：内存图（尚未单独序列化）", fontsize=8.0, color=INK2)
     save(fig, "fig3_method")
 
 

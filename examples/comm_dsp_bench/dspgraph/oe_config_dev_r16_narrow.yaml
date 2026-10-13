@@ -1,0 +1,92 @@
+max_iterations: 60
+checkpoint_interval: 10
+log_level: INFO
+language: python
+random_seed: 0
+llm:
+  api_base: https://api.deepseek.com
+  api_key: ${DEEPSEEK_API_KEY}
+  primary_model: deepseek-flash
+  primary_model_weight: 1.0
+  temperature: 0.7
+  max_tokens: 8000
+  timeout: 300
+  retries: 1
+  extra_body:
+    thinking:
+      type: disabled
+prompt:
+  system_message: "你是数字通信硬件架构师。任务：写一段 Python 程序 build(g, spec)，用下面的原语搭出实现给定数学功能的\n\
+    硬件。在满足全部指标的前提下，使硬件面积尽可能小。你可以使用任何等价变换或近似变换（改变运算顺序、\n多级分解、多相、利用对称、零系数、查表镜像、截短位宽、分时复用等），不要求与理想数学逐位相等，\n\
+    只要求指标达标。\n\n【数学功能】\n实数 ADC 输入 x[n]（采样率 1）中，中频 f_if 处有带宽 ±passband 的期望信号，另有若干阻塞音。要求输出复基带\
+    \ y[m] = (h * (x·e^{-j2π f_if n}))[m·R]，即混频到零频、低通滤波并抽取 R 倍；h 为任意满足通带纹波与混叠抑制要求的低通。系统\
+    \ SNR 在冻结场景上相对理想基带期望信号测量。\n\n【规格】（spec 对象的字段可在程序中直接读取）\n{\n \"r_total(总抽取)\":\
+    \ 16,\n \"fs_out(输出率,相对输入)\": 0.0625,\n \"passband(通带边缘,相对输入率)\": 0.015625,\n\
+    \ \"f_if(中频)\": 0.22130000009201467,\n \"fcw(32位相位字=round(f_if*2^32))\": 950476263,\n\
+    \ \"input_bits\": 12,\n \"output_bits\": 16,\n \"ripple_max_db\": 0.5,\n \"各测试场景SNR门槛dB\"\
+    : [\n  50.81,\n  50.88\n ],\n \"理想接收机SNR上限dB\": [\n  52.31,\n  52.38\n ],\n \"\
+    blocker_rel_db(阻塞音相对期望信号)\": 20.0\n}\n\n【原语】\n- g.input() -> 'Sig': 实数 ADC 输入：有符号\
+    \ input_bits 位、f = input_bits-1（数值范围 [-1, 1)）。\n- g.const(value: 'float', w: 'int',\
+    \ f: 'int') -> 'Sig': \n- g.counter(step: 'int', bits: 'int') -> 'Sig': 无符号计数器（输入速率域）：第\
+    \ n 个输入样点时值为 (n·step) mod 2^bits。\n- g.add(a: 'Sig', b: 'Sig') -> 'Sig': \n- g.sub(a:\
+    \ 'Sig', b: 'Sig') -> 'Sig': \n- g.neg(a: 'Sig') -> 'Sig': \n- g.mul(a: 'Sig',\
+    \ b: 'Sig') -> 'Sig': 通用乘法器（两个变量相乘）。\n- g.scale(a: 'Sig', c: 'float', bits: 'int'\
+    \ = 16) -> 'Sig': 乘以实常数 c：c 量化为 bits 位有效位，用移位加（CSD）实现，不占用乘法器。\n- g.shift(a: 'Sig',\
+    \ k: 'int') -> 'Sig': 乘以 2^k（k 可正可负）：只移动小数点，不产生硬件。\n- g.q(a: 'Sig', w: 'int',\
+    \ f: 'int', rnd: 'str' = 'round', ovf: 'str' = 'sat') -> 'Sig': 重量化到 w 位（含符号）、f\
+    \ 位小数。rnd: 'round'|'trunc'；ovf: 'sat'|'wrap'。 ovf='wrap' 表示模运算语义（地址、相位、CIC 寄存器），诊断加宽时不改变它。\n\
+    - g.bits(a: 'Sig', hi: 'int', lo: 'int') -> 'Sig': 取位 a[hi:lo]（二进制补码位），结果为无符号整数。\n\
+    - g.mux(sel: 'Sig', a: 'Sig', b: 'Sig') -> 'Sig': sel（1 位无符号，例如 bits(x, k, k)）为\
+    \ 1 选 a，否则选 b。\n- g.lut(addr: 'Sig', values, w: 'int', f: 'int') -> 'Sig': 只读查找表：addr\
+    \ 为无符号信号，values 为实数列表（量化到 w 位、f 位小数）。\n- g.reg(a: 'Sig') -> 'Sig': 流水寄存器（多一个时钟周期，不改变样点序列）。\n\
+    - g.delay_line(a: 'Sig', n: 'int') -> 'list[Sig]': 返回 [x[k], x[k-1], ..., x[k-n+1]]：n\
+    \ 个对齐的抽头（共 n 个样点寄存器）。\n- g.delay(a: 'Sig', k: 'int') -> 'Sig': x[n-k]（k ≥ 1）。与当前样点组合时直接组合即可，编译器会自动对齐。\n\
+    - g.integrate(a: 'Sig', w: 'int') -> 'Sig': 累加器 y[n] = y[n-1] + x[n]，在 w 位上模 2^w\
+    \ 回绕。\n- g.decimate(a: 'Sig', r: 'int', phase: 'int' = 0) -> 'Sig': 每 r 个样点保留\
+    \ 1 个（第 m 个输出 = 输入下标 m·r + phase），进入 period×r 的速率域。 同一来源、同一 r 的抽取（任意 phase）属于同一速率域，可以直接相加——这正是多相分解：\
+    \ Σ_p decimate(滤波分支_p(delay(x, p)), r, ...) 等。编译器把不同 phase 当作额外延迟自动对齐。 要求输入每个时钟一个样点（in_valid\
+    \ 恒为 1）。\n- g.mac(terms, coef_bits: 'int' = 16, share: 'int' = 1) -> 'Sig': 常系数乘加\
+    \ Σ c_i·x_i。terms = [(信号, 实系数), ...]；系数共用一个缩放，量化到 coef_bits 位。 share=1：每个乘积用移位加（CSD）实现，零系数不产生硬件。\
+    \ share=F>1：每个物理乘法器分时服务 F 个乘积，共 ceil(K/F) 个通用乘法器； 要求该速率域每个样点至少有 F 个时钟周期（F ≤ period）。\n\
+    - g.scope(name: 'str'): 给一段电路命名：面积、饱和与诊断按此名称分组汇报。\n- g.probe(name: 'str', i: 'Sig',\
+    \ q: 'Sig | None' = None) -> 'None': 观测点（不产生硬件）：裁判报告该中间信号相对理想期望信号的带内 SNR、残留带外功率、\
+    \ 增益与群时延。i/q 为复信号两路（实信号只给 i）。最多 8 个。\n- g.output(i: 'Sig', q: 'Sig') -> 'None':\
+    \ 复基带输出：两路都必须是有符号 output_bits 位、f = output_bits-1。\n\n定点与时序约定（编译器自动处理时钟对齐，你只写样点级数学）：\n\
+    - 信号是有符号定点数：w 位总宽、f 位小数（数值 = 整数码 × 2^-f）。sig.w、sig.f 可读。\n- add/sub 自动对齐小数点并扩\
+    \ 1 位；mul 位宽相加；位宽只在 g.q() 处裁剪。任何信号宽度不得超过 62 位。\n- 每个信号属于一个速率域；decimate 进入更慢的域；不同速率域的信号不能直接组合。\n\
+    - 面积代价：通用乘法器(mul、mac share>1)最贵；常数乘(scale、mac share=1)按移位加数计价，\n  零系数免费；查表按存储位计价；延迟线、积分器按寄存器位计价。\n\
+    - 可用模块：np(numpy)、scipy(含 scipy.signal)、math。程序在构造时可以做任意离线计算（例如设计滤波器系数）。\n- 用 `with\
+    \ g.scope(\"名字\"):` 给电路分段，面积与诊断会按段汇报。\n- 用 g.probe(\"名字\", i, q) 观测中间信号（不产生硬件）；在提供验证信息的反馈中会报告各观测点的\n\
+    \  带内 SNR、带外残留、增益与时延，可用于定位是哪一级出了问题。\n- 若程序报错（Python 异常或构造规则错误），会立即把错误返回给你修复，修复也计入调用次数。\n\
+    \nAPI 语义要点（只是原语用法，不是设计建议）：\n- 相位/时间索引：g.counter(step, bits) 在输入速率给出 n·step mod\
+    \ 2^bits；g.bits 取其高位作查表地址。\n- 输入速率的信号（如计数器）要在抽取后的速率使用，先对它做同样的 g.decimate(sig,\
+    \ r, phase)。\n- g.delay_line(x, n)[j] 是 x[k-j]；g.delay(x, k) 是 x[k-k0]（k0=k）。\n\
+    - g.decimate(v, r, p) 的第 m 个输出是 v[m·r+p]；同一来源、同一 r 的不同 p 可直接相加。\n- 常数必须用 g.const(value,\
+    \ w, f) 包装，或用 g.scale/g.mac 乘常数；不能把 Python 数直接传给 add/sub/mux。\n- 输出前用 g.q(x, output_bits,\
+    \ output_bits-1) 得到接口格式；g.shift(x, k) 乘 2^k 用于增益调整。\n\n【评分】裁判只看输入输出：把冻结测试信号（通带内\
+    \ 24 个复音 + 3 个落在混叠频带的强阻塞音）送入你的\n电路，对照理想基带期望信号计算 SNR（自动搜索群时延，只拟合一个复增益；混叠、通带失真、量化噪声全部算误差）\n\
+    和通带纹波。每个场景都必须 SNR ≥ 门槛且纹波 ≤ 上限。输出样点数必须满足 input_rate/16。\n\n【回答格式】按要求给出对当前程序的修改。优先做有针对性的局部改动，并保持程序达标；每次改动要有明确的面积收益理由。"
+  num_top_programs: 2
+  num_diverse_programs: 1
+  include_artifacts: true
+  use_template_stochasticity: true
+database:
+  population_size: 40
+  archive_size: 20
+  num_islands: 2
+  feature_dimensions:
+  - area_log
+  - snr_margin
+  feature_bins:
+    area_log: 8
+    snr_margin: 6
+  elite_selection_ratio: 0.2
+  exploration_ratio: 0.3
+  exploitation_ratio: 0.7
+evaluator:
+  cascade_evaluation: false
+  timeout: 300
+  parallel_evaluations: 4
+diff_based_evolution: true
+full_rewrite_probability: 0.0
+max_code_length: 30000

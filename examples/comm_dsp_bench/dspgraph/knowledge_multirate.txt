@@ -1,0 +1,14 @@
+【多速率结构知识（原语写法示例，参数需自行决定）】
+1. CIC 抽取（无乘法器）：N 级积分器 → 抽取 R → N 级梳状器。寄存器需要 W = 输入位宽 + ceil(N·log2(R·M)) 位，并使用模回绕：
+       for _ in range(N): v = g.integrate(v, W)
+       v = g.decimate(v, R)
+       for _ in range(N): v = g.q(g.sub(v, g.delay(v, M)), W, v.f, ovf="wrap")
+       v = g.q(g.shift(v, -ceil(N*log2(R*M))), w_out, w_out - 1)
+   频响为 sinc^N，通带有下垂（可在后级 FIR 里补偿），零点位于输出采样率的整数倍。
+2. 半带抽取（抽取 2）：抽头数为 4m+3，中心系数 0.5，与中心距离为偶数（非零）的系数全部为 0，零系数不产生硬件；要求通带 < 输入采样率/4。
+   系数可用 scipy.signal.firls(nt, [0, fp, 0.5-fp, 0.5], [1, 1, 0, 0]) 设计后，把这些位置强制置 0。
+3. 先抽取后滤波（多相）：抽取 R 的 FIR 可以拆成 R 个相位分支，每个分支先 decimate 再在低速率域做乘加：
+       branch_p = g.decimate(g.delay(v, p), R)   # 第 p 相：v[mR - p]
+       y = Σ_p g.mac(zip(g.delay_line(branch_p, L), h[p::R]))
+   乘加只在 1/R 速率下进行，可以配合 share>1 分时复用乘法器。
+4. 多级：常见组合是 CIC 做大倍率粗抽取，再用若干半带，最后用一级补偿 FIR（compensate CIC droop）完成通带整形。
