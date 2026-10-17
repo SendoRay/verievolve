@@ -1,5 +1,7 @@
 # 框架图 v6 草图（ASCII，待确认）
 
+可编辑版本：[`framework_v6.drawio`](framework_v6.drawio)；展示版：[`framework_v6.png`](framework_v6.png)（另附可缩放的 [`framework_v6.svg`](framework_v6.svg)）。
+
 用等宽字体查看（VS Code 打开本文件即可；预览模式下代码块也是等宽）。确认后再画 drawio 版。
 
 ```text
@@ -53,18 +55,3 @@
    - 已核实的 bit-exact 修改直接继承父节点的质量结论，不重测。
 4. **Stage 3**：通过的候选冻结为 Frozen Contract；Lowering Agent 在契约内写 RTL，由 Fidelity Check 检查 RTL 与候选逐位、按事务一致。不一致就在框内局部修复（fix），不回到树。
 5. **Stage 4**：RTL 做综合与 STA，得到真实 PPA（同时经反馈总线写回树）→ 在 FEASIBLE 节点中取质量–PPA 的 Pareto Front → Final Check 用搜索从未见过的场景复测，结果不回传 → 输出 Verilog 和报告。
-
-## 相对旧图的改动
-
-- 主流程只有一条，从左到右；回到树的反馈合并成底部一条总线。
-- Stage 3 的局部修复画成循环框（参照 HINT 的 Verify & Debug Loop）。
-- bit-exact 继承不再画单独箭头，写在 System Quality 框内。
-- 删除 Faithful RTL 框和 M1/M2a/M2b/M3 标签；三个方法的对应关系改写在图注中：
-  Method 1 = Stage 1 中被修改的原语程序；Method 2 = 检查 1、2 与 Fidelity Check；Method 3 = AND/OR 树及其反馈回路。
-- drawio 版：五列统一浅底色 + 灰色表头，放大字号。
-
-## 待你确认
-
-1. Stage 4 的 Final Check 是否保留？（作用：用未见过的场景复测且不回传，防止设计“背题”。）
-2. Task Contract → Design Agent 的箭头（智能体能看到契约）是否保留？
-3. Stage 名称 *Candidate Check* / *RTL Lowering* 是否可以？
