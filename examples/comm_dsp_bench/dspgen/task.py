@@ -122,9 +122,9 @@ def get(name: str) -> Task:
 
 
 def run_program(code: str, task_name: str, scenarios, extra_bits=0, extra_scopes=None, want_verilog=False,
-                timeout=180) -> dict:
+                timeout=180, want_outputs=False) -> dict:
     req = {"code": code, "task": task_name, "scenarios": list(scenarios), "extra_bits": extra_bits,
-           "extra_scopes": extra_scopes, "want_verilog": want_verilog}
+           "extra_scopes": extra_scopes, "want_verilog": want_verilog, "want_outputs": want_outputs}
     try:
         pr = subprocess.run([sys.executable, "-W", "ignore", "-m", "dspgen.worker"], input=json.dumps(req),
                             capture_output=True, text=True, cwd=BENCH, timeout=timeout)

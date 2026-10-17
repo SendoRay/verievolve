@@ -11,10 +11,15 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from src.font_config import SIMPLIFIED_CHINESE_FONTS, register_simplified_chinese_fonts
+
 # 与 make_data_figures.py 相同的角色配色
 C_OURS, C_BASE, C_REF, C_NAIVE = "#2a78d6", "#eb6834", "#1baf7a", "#8a8984"
 INK, INK2, GRID, SURFACE = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb"
-plt.rcParams.update({"font.sans-serif": ["PingFang SC", "Heiti SC", "Arial Unicode MS"], "axes.unicode_minus": False,
+register_simplified_chinese_fonts()
+plt.rcParams.update({"font.family": "sans-serif",
+                     "font.sans-serif": SIMPLIFIED_CHINESE_FONTS,
+                     "axes.unicode_minus": False, "pdf.fonttype": 42, "ps.fonttype": 42,
                      "font.size": 10, "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True,
                      "grid.color": GRID, "axes.axisbelow": True, "figure.facecolor": SURFACE, "axes.facecolor": SURFACE,
                      "savefig.facecolor": SURFACE, "legend.frameon": False})
@@ -33,7 +38,7 @@ for x, r in zip(xs, rows):
     if best is not None:
         bx.append(x); by.append(best / 1e3)
 ax.step(bx, by, where="post", color=C_OURS, linewidth=2, zorder=2, label="当前最优达标面积")
-for y, lab, col in [(92.264, "原进化方法 M（真实面积）", C_BASE), (29.2, "原模板参数搜索 R", C_REF)]:
+for y, lab, col in [(29.2, "固定结构参数调优（真实面积，仅参考）", C_REF)]:
     ax.axhline(y, color=col, linestyle="--", linewidth=1.3)
     ax.text(len(rows) + 0.4, y, lab, va="center", fontsize=8.5, color=INK2)
 ax.set_yscale("log")

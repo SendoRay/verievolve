@@ -25,12 +25,20 @@ def main():
         env["build"](g, spec)
         if g.y is None:
             raise BuildError("structure", "build() never called g.output(...)")
-        out = {"ok": True, "area": g.area(), "stats": g.stats, "saturation": g.sat,
+        sat, verilog = g.sat, None
+        if getattr(g, "rtl_numerics", False):        # 含时钟域（反馈）：逐位语义取自 RTL 仿真
+            open_states = [n for n, st in g._states.items() if not st["closed"]]
+            if open_states:
+                raise BuildError("structure", f"g.state() never closed with g.close(): {open_states[:4]}")
+            from .rtlsim import simulate
+            g.y, rtl_probes, verilog = simulate(g, x, xq)
+            sat = {"note": "含时钟域的设计逐位语义来自 RTL 仿真，不统计饱和；请用 g.probe 观测"}
+        out = {"ok": True, "area": g.area(), "stats": g.stats, "saturation": sat,
                "scores": [task.score(i, g.y[k]) for k, i in enumerate(idxs)]}
         if req.get("want_verilog"):
-            out["verilog"] = g.verilog()
-            yy = np.asarray(g.y)
-            out["outputs"] = {str(i): [yy[k].real.tolist(), yy[k].imag.tolist()] for k, i in enumerate(idxs)}
+            out["verilog"] = verilog or g.verilog()
+        if req.get("want_verilog") or req.get("want_outputs"):
+            out["outputs"] = {str(i): [np.real(g.y[k]).tolist(), np.imag(g.y[k]).tolist()] for k, i in enumerate(idxs)}
     except BuildError as e:
         out = {"ok": False, "error": e.as_dict()}
     except Exception as e:

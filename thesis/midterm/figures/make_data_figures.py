@@ -15,6 +15,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+from src.font_config import SIMPLIFIED_CHINESE_FONTS, register_simplified_chinese_fonts
+
 B = Path(sys.argv[1])
 OUT = Path(sys.argv[2])
 
@@ -23,10 +25,15 @@ C_OURS, C_BASE, C_REF, C_NAIVE = "#2a78d6", "#eb6834", "#1baf7a", "#8a8984"
 C_EXTRA = ["#eda100", "#e87ba4"]
 INK, INK2, GRID, SURFACE = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb"
 
+register_simplified_chinese_fonts()
+
 plt.rcParams.update(
     {
-        "font.sans-serif": ["PingFang SC", "Heiti SC", "Arial Unicode MS"],
+        "font.family": "sans-serif",
+        "font.sans-serif": SIMPLIFIED_CHINESE_FONTS,
         "axes.unicode_minus": False,
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
         "font.size": 10,
         "axes.edgecolor": INK2,
         "axes.labelcolor": INK,

@@ -4,7 +4,7 @@ from dspgraph.llm_prog import GENERAL, PRIMS
 from dspgraph.sdf import Graph
 from .graph import TaskGraph
 
-EXTRA = ("interpolate",)
+EXTRA = ("interpolate", "gather", "clock", "state", "close", "sample", "ram")
 
 
 def api_doc():

@@ -12,6 +12,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Polygon
 
+from src.font_config import SIMPLIFIED_CHINESE_FONTS, register_simplified_chinese_fonts
+
 OUT = Path(sys.argv[1])
 
 INK, INK2, SURFACE = "#0b0b0b", "#52514e", "#ffffff"
@@ -23,10 +25,15 @@ YELLOW, YELLOW_T = "#c98500", "#fbeccb"
 VIOLET, VIOLET_T = "#4a3aa7", "#e3e0f4"
 GRAY, GRAY_T = "#8a8984", "#efeeeb"
 
+register_simplified_chinese_fonts()
+
 plt.rcParams.update(
     {
-        "font.sans-serif": ["PingFang SC", "Heiti SC", "Arial Unicode MS"],
+        "font.family": "sans-serif",
+        "font.sans-serif": SIMPLIFIED_CHINESE_FONTS,
         "axes.unicode_minus": False,
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
         "figure.facecolor": SURFACE,
         "savefig.facecolor": SURFACE,
     }

@@ -7,6 +7,7 @@ from .task import get, run_program
 
 
 def _tb(task, n):
+    """测试平台；最后一个输入之后再跑 DRAIN 个时钟，让有固有时延的设计吐完输出。"""
     b, bo = task.interface["in_bits"], task.interface["out_bits"]
     cx_in, cx_out = task.iface("in_kind") == "complex", task.iface("out_kind") == "complex"
     P = task.iface("in_period")
@@ -17,6 +18,7 @@ def _tb(task, n):
     od = f"wire signed [{bo - 1}:0] out_q;" if cx_out else ""
     oc = ", .out_q(out_q)" if cx_out else ""
     ow = '$fwrite(fo, "%0d %0d\\n", out_i, out_q);' if cx_out else '$fwrite(fo, "%0d\\n", out_i);'
+    drain = 4096 if hasattr(task, "frame_outputs") else 1024
     return f"""`timescale 1ns/1ps
 module tb;
 reg clk = 0; reg rst = 1; reg in_valid = 0; reg signed [{b - 1}:0] in_i = 0; {qd}
@@ -33,7 +35,7 @@ initial begin
     in_i = mem[k]; {qr} in_valid = 1; @(posedge clk); #1 in_valid = 0;
     for (j = 1; j < {P}; j = j + 1) begin @(posedge clk); #1; end
   end
-  repeat (512) @(posedge clk);
+  repeat ({drain}) @(posedge clk);
   $fclose(fo); $finish;
 end
 endmodule
@@ -69,5 +71,7 @@ def crosscheck(code, task_name, scenario=0, n_in=2000):
     bad = int(np.count_nonzero(got[:m, 0] != exp_i[:m]))
     if got.shape[1] > 1:
         bad += int(np.count_nonzero(got[:m, 1] != exp_q[:m]))
-    return {"passed": bad == 0 and len(got) >= exp_n - 1, "rtl_outputs": len(got), "expected_outputs": exp_n,
+    need = len(sc["reference"]) if hasattr(task, "frame_outputs") else exp_n - 1   # 打分所需的输出数
+    return {"passed": bad == 0 and m >= min(need, exp_n), "rtl_outputs": len(got), "expected_outputs": exp_n,
+            "needed_for_scoring": need,
             "compared": m, "mismatches": bad, "sim_seconds": time.time() - t0}

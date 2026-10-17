@@ -180,7 +180,7 @@ class Graph:
     def _decl(self, s: Sig, expr: str | None = None, reg: bool = False) -> Sig:
         kind = "reg" if reg else "wire"
         sg = "signed " if s.signed else ""
-        rng = f"[{s.W - 1}:0] " if (s.W > 1 or s.signed) else ""
+        rng = f"[{s.W - 1}:0] "     # 1 位信号也声明范围，便于 x[0:0] 取位（iverilog 不允许对标量取位）
         self.L.append(f"{kind} {sg}{rng}{s.name}" + (f" = {expr};" if expr is not None else ";"))
         return s
 
@@ -417,7 +417,7 @@ class Graph:
     def q(self, a: Sig, w: int, f: int, rnd: str = "round", ovf: str = "sat") -> Sig:
         """重量化到 w 位（含符号）、f 位小数。rnd: 'round'|'trunc'；ovf: 'sat'|'wrap'。
 
-        ovf='wrap' 表示模运算语义（地址、相位、CIC 寄存器），诊断加宽时不改变它。"""
+        ovf='wrap' 表示模运算语义（例如地址、相位累加），诊断加宽时不改变它。"""
         self._chk(a)
         e = self._extra_here() if ovf == "sat" else a.F - a.f
         return self._q(a, int(w) + e, int(f) + e, rnd, ovf, int(w), int(f))
